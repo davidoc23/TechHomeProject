@@ -1,0 +1,11 @@
+{
+  "asr": {
+    "rms_mic_threshold": 196,
+    "device": "auto"
+  },
+  "tts": {
+    "model_file_name": "EN-Leon-V1_1-G_600000.pth",
+    "device": "auto"
+  },
+  "wake_word": {}
+}
