@@ -1,4 +1,4 @@
-node_modules/
+echo "node_modules/
 .expo/
 dist/
 npm-debug.*
@@ -8,4 +8,4 @@ npm-debug.*
 *.key
 *.mobileprovision
 *.orig.*
-web-build/
+web-build/" > .gitignore
