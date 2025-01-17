@@ -6,7 +6,7 @@ import { deviceStyles } from '../styles/deviceStyles';
 import { useDevices } from '../hooks/useDevices';
 
 export default function DevicesScreen() {
-  const { devices, toggleDevice } = useDevices();
+  const { devices, toggleDevice, setTemperature } = useDevices();
   
   return (
     <ScrollView style={deviceStyles.container}>
@@ -22,6 +22,7 @@ export default function DevicesScreen() {
           key={device.id} 
           device={device} 
           onToggle={toggleDevice} 
+          onTemperatureChange={setTemperature}
         />
       ))}
     </ScrollView>

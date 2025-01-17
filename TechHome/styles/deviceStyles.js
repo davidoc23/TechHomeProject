@@ -53,4 +53,28 @@ export const deviceStyles = StyleSheet.create({
         color: '#666',
         marginTop: 4,
       },
+      temperatureControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+        gap: 12,
+    },
+    tempButton: {
+        backgroundColor: '#007AFF',
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    tempButtonText: {
+        color: 'white',
+        fontSize: 20,
+        fontWeight: 'bold',
+    },
+    tempDisplay: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#666',
+    },
     });
