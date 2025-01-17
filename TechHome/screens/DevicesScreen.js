@@ -1,6 +1,7 @@
 // src/screens/DevicesScreen.js
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { DeviceCard } from '../components/devices/DeviceCard';
 
 export default function DevicesScreen() {
   return (
