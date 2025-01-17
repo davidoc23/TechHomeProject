@@ -35,7 +35,7 @@ export function useDevices() {
                 addActivity(
                     device.name, 
                     device.type === 'thermostat'
-                        ? `set to ${device.temperature}°F`
+                        ? `${newState ? 'turned on' : 'turned off'} (${device.temperature}°F)`
                         : (newState ? 'turned on' : 'turned off')
                 );
                 return { ...device, isOn: newState };
