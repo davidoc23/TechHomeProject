@@ -1,27 +1,29 @@
 // src/screens/DevicesScreen.js
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
 import { DeviceCard } from '../components/devices/DeviceCard';
 import { deviceStyles } from '../styles/deviceStyles';
+import { useDevices } from '../hooks/useDevices';
 
 export default function DevicesScreen() {
+  const { devices, toggleDevice } = useDevices();
+  
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>My Devices</Text>
-      <Text>Testing if render works</Text>
-    </View>
+    <ScrollView style={deviceStyles.container}>
+      <View style={deviceStyles.header}>
+        <Text style={deviceStyles.title}>My Devices</Text>
+        <Text style={deviceStyles.subtitle}>
+          {devices.filter(d => d.isOn).length} devices turned on
+        </Text>
+      </View>
+      
+      {devices.map(device => (
+        <DeviceCard 
+          key={device.id} 
+          device={device} 
+          onToggle={toggleDevice} 
+        />
+      ))}
+    </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#f5f5f5',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-});

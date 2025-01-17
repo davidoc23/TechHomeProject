@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Switch } from 'react-native';
+import { View, Text, Switch, } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { deviceStyles } from '../../styles/deviceStyles';
 
@@ -11,9 +11,9 @@ export const DeviceCard = ({ device, onToggle }) => (
           size={24} 
           color={device.isOn ? '#007AFF' : '#666'}
         />
-        <View style={styles.deviceDetails}>
-          <Text style={styles.deviceName}>{device.name}</Text>
-          <Text style={styles.deviceStatus}>
+        <View style={deviceStyles.deviceDetails}>
+          <Text style={deviceStyles.deviceName}>{device.name}</Text>
+          <Text style={deviceStyles.deviceStatus}>
             {device.type === 'thermostat' 
               ? `Temperature: ${device.temperature}°C` 
               : device.isOn ? 'On' : 'Off'}
