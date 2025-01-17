@@ -5,11 +5,25 @@ import { useDevices } from '../hooks/useDevices';
 import { homeStyles } from '../styles/homeStyles'; 
 
 export default function HomeScreen() {
-  const { devices, activities , toggleDevice } = useDevices();
+  const { devices, activities , toggleDevice, toggleAllLights } = useDevices();
 
   // Calculate quick stats
   const activeDevices = devices.filter(d => d.isOn).length;
   const totalDevices = devices.length;
+
+  const handleAllLights = () => {
+    const lightDevices = devices.filter(device => device.type === 'light');
+    const anyLightOn = lightDevices.some(light => light.isOn);
+    toggleAllLights(!anyLightOn);  // If any light is on, turn all off. Otherwise, turn all on
+};
+
+
+  const handleThermostat = () => {
+    const thermostat = devices.find(device => device.type === 'thermostat');
+    if (thermostat) {
+      toggleDevice(thermostat.id);
+    }
+  };
 
   return (
     <ScrollView style={homeStyles.container}>
@@ -25,16 +39,25 @@ export default function HomeScreen() {
       <View style={homeStyles.section}>
         <Text style={homeStyles.sectionTitle}>Quick Actions</Text>
         <View style={homeStyles.quickActions}>
-          <TouchableOpacity style={homeStyles.actionButton}>
+
+          <TouchableOpacity 
+            style={homeStyles.actionButton}
+            onPress={handleAllLights}
+          >
             <Ionicons name="bulb" size={24} color="#007AFF" />
             <Text style={homeStyles.actionText}>All Lights</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={homeStyles.actionButton}>
+
+          <TouchableOpacity 
+            style={homeStyles.actionButton}
+            onPress={handleThermostat}
+          >
             <Ionicons name="thermometer" size={24} color="#007AFF" />
             <Text style={homeStyles.actionText}>
               Thermostat ({devices.find(d => d.type === 'thermostat')?.temperature}°F)
             </Text>
           </TouchableOpacity>
+          
         </View>
       </View>
 

@@ -17,9 +17,14 @@ export function useDevices() {
     const [devices, setDevices] = useState(deviceState);
     const [activities, setActivities] = useState(activityState );
 
+    //function to create unique IDs
+    const generateUniqueId = () => {
+        return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    };
+
     const addActivity = (deviceName, action) => {
         const newActivity = {
-            id: Date.now(),
+            id: generateUniqueId(), //instead of just Date.now()
             deviceName,
             action,
             timestamp: new Date()
@@ -49,6 +54,26 @@ export function useDevices() {
         listeners.forEach(listener => listener(updatedDevices, activityState));
     };
 
+    const toggleAllLights = (desiredState) => {
+        const updatedDevices = devices.map(device => {
+            if (device.type === 'light') {
+                if (device.isOn !== desiredState) {
+                    addActivity(
+                        device.name,
+                        desiredState ? 'turned on' : 'turned off'
+                    );
+                    return { ...device, isOn: desiredState };
+                }
+            }
+            return device;
+        });
+
+        deviceState = updatedDevices;
+        setDevices(updatedDevices);
+        setActivities(activityState);
+        listeners.forEach(listener => listener(updatedDevices, activityState));
+    };
+
     // Subscribe to changes
     useEffect(() => {
         const listener = (newDevices, newActivities) => {
@@ -61,5 +86,5 @@ export function useDevices() {
         };
     }, []);
 
-    return { devices, activities, toggleDevice };
+    return { devices, activities, toggleDevice, toggleAllLights  };
 }
