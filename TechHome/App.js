@@ -4,14 +4,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text } from 'react-native'; // Add this for temporary screens
 import DevicesScreen from './screens/DevicesScreen';
+import HomeScreen from './screens/HomeScreen';
 
-
-// Temporary basic screen components
-const HomeScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>Home Screen</Text>
-  </View>
-);
 
 const AutomationScreen = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
