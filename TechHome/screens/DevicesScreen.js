@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { DeviceCard } from '../components/devices/DeviceCard';
+import { deviceStyles } from '../styles/deviceStyles';
 
 export default function DevicesScreen() {
   return (
