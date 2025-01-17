@@ -74,6 +74,24 @@ export function useDevices() {
         listeners.forEach(listener => listener(updatedDevices, activityState));
     };
 
+    const setTemperature = (id, newTemp) => {
+        const updatedDevices = devices.map(device => {
+            if (device.id === id && device.type === 'thermostat') {
+                addActivity(
+                    device.name,
+                    `temperature set to ${newTemp}°F`
+                );
+                return { ...device, temperature: newTemp };
+            }
+            return device;
+        });
+        
+        deviceState = updatedDevices;
+        setDevices(updatedDevices);
+        setActivities(activityState);
+        listeners.forEach(listener => listener(updatedDevices, activityState));
+    };
+
     // Subscribe to changes
     useEffect(() => {
         const listener = (newDevices, newActivities) => {
@@ -86,5 +104,5 @@ export function useDevices() {
         };
     }, []);
 
-    return { devices, activities, toggleDevice, toggleAllLights  };
+    return { devices, activities, toggleDevice, toggleAllLights, setTemperature };
 }
