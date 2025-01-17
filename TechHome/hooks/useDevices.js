@@ -11,32 +11,55 @@ const initialDevices = [
 //Single instance of state
 let deviceState = initialDevices;
 let listeners = [];
+let activityState = [];
 
 export function useDevices() {
     const [devices, setDevices] = useState(deviceState);
+    const [activities, setActivities] = useState(activityState );
+
+    const addActivity = (deviceName, action) => {
+        const newActivity = {
+            id: Date.now(),
+            deviceName,
+            action,
+            timestamp: new Date()
+        };
+        activityState = [newActivity, ...activityState].slice(0, 5);
+    };
+
 
     const toggleDevice = (id) => {
-        const updatedDevices = devices.map(device => 
-            device.id === id ? { ...device, isOn: !device.isOn } : device
-        );
+        const updatedDevices = devices.map(device => {
+            if (device.id === id) {
+                const newState = !device.isOn;
+                addActivity(
+                    device.name, 
+                    device.type === 'thermostat'
+                        ? `set to ${device.temperature}°F`
+                        : (newState ? 'turned on' : 'turned off')
+                );
+                return { ...device, isOn: newState };
+            }
+            return device;
+        });
+        
         deviceState = updatedDevices;
         setDevices(updatedDevices);
-        // Update all other components
-        listeners.forEach(listener => listener(updatedDevices));
+        setActivities(activityState);
+        listeners.forEach(listener => listener(updatedDevices, activityState));
     };
 
     // Subscribe to changes
     useEffect(() => {
-        const listener = (newDevices) => {
-            if (newDevices !== devices) {
-                setDevices(newDevices);
-            }
+        const listener = (newDevices, newActivities) => {
+            setDevices(newDevices);
+            setActivities(newActivities);
         };
         listeners.push(listener);
         return () => {
             listeners = listeners.filter(l => l !== listener);
         };
-    }, [devices]); // Add devices as dependency
+    }, []);
 
-    return { devices, toggleDevice };
+    return { devices, activities, toggleDevice };
 }
