@@ -13,7 +13,8 @@ def home():
         "endpoints": {
             "devices": "/api/devices",
             "toggle": "/api/devices/<id>/toggle",
-            "temperature": "/api/devices/<id>/temperature"
+            "temperature": "/api/devices/<id>/temperature",
+            "toggle_all_lights": "/api/devices/toggle-all-lights"
         }
     })
 

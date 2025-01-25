@@ -1,9 +1,10 @@
-# routes/device_routes.py
 from flask import Blueprint, jsonify, request
+from flask_cors import CORS
 
 device_routes = Blueprint('devices', __name__)
+CORS(device_routes)
 
-# Temporary device storage (will replace with MongoDB later)
+# Initial device state
 devices = [
     {"id": 1, "name": "Living Room Light", "type": "light", "isOn": False},
     {"id": 2, "name": "Kitchen Light", "type": "light", "isOn": False},
@@ -13,21 +14,52 @@ devices = [
 
 @device_routes.route('/', methods=['GET'])
 def get_devices():
-    return jsonify(devices)
+    try:
+        return jsonify(devices), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @device_routes.route('/<int:device_id>/toggle', methods=['POST'])
 def toggle_device(device_id):
-    device = next((d for d in devices if d["id"] == device_id), None)
-    if device:
+    try:
+        device = next((d for d in devices if d["id"] == device_id), None)
+        if not device:
+            return jsonify({"error": "Device not found"}), 404
+            
         device["isOn"] = not device["isOn"]
-        return jsonify(device)
-    return jsonify({"error": "Device not found"}), 404
+        return jsonify(device), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@device_routes.route('/toggle-all-lights', methods=['POST'])
+def toggle_all_lights():
+    try:
+        data = request.get_json()
+        if 'desiredState' not in data:
+            return jsonify({"error": "Desired state required"}), 400
+            
+        for device in devices:
+            if device['type'] == 'light':
+                device['isOn'] = data['desiredState']
+                
+        return jsonify(devices), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @device_routes.route('/<int:device_id>/temperature', methods=['POST'])
 def set_temperature(device_id):
-    data = request.get_json()
-    device = next((d for d in devices if d["id"] == device_id), None)
-    if device and device["type"] == "thermostat":
+    try:
+        data = request.get_json()
+        if not data or 'temperature' not in data:
+            return jsonify({"error": "Temperature value required"}), 400
+
+        device = next((d for d in devices if d["id"] == device_id), None)
+        if not device:
+            return jsonify({"error": "Device not found"}), 404
+        if device["type"] != "thermostat":
+            return jsonify({"error": "Device is not a thermostat"}), 400
+
         device["temperature"] = data["temperature"]
-        return jsonify(device)
-    return jsonify({"error": "Device not found or not a thermostat"}), 404
+        return jsonify(device), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

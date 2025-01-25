@@ -1,108 +1,77 @@
-import { useState, useEffect } from 'react';
+import { useDeviceContext } from '../context/DeviceContext';
 
-// Shared initial state
-const initialDevices = [
-    { id: 1, name: 'Living Room Light', type: 'light', isOn: false },
-    { id: 2, name: 'Kitchen Light', type: 'light', isOn: false },
-    { id: 3, name: 'Bedroom Light', type: 'light', isOn: false },
-    { id: 4, name: 'Living Room Thermostat', type: 'thermostat', temperature: 20, isOn: true },
-];
-
-//Single instance of state
-let deviceState = initialDevices;
-let listeners = [];
-let activityState = [];
+const API_URL = 'http://localhost:5000/api/devices';
 
 export function useDevices() {
-    const [devices, setDevices] = useState(deviceState);
-    const [activities, setActivities] = useState(activityState );
+    const { devices, activities, error, fetchDevices, addActivity, setDevices } = useDeviceContext();
 
-    //function to create unique IDs
-    const generateUniqueId = () => {
-        return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    };
-
-    const addActivity = (deviceName, action) => {
-        const newActivity = {
-            id: generateUniqueId(), //instead of just Date.now()
-            deviceName,
-            action,
-            timestamp: new Date()
-        };
-        activityState = [newActivity, ...activityState].slice(0, 5);
-    };
-
-
-    const toggleDevice = (id) => {
-        const updatedDevices = devices.map(device => {
-            if (device.id === id) {
-                const newState = !device.isOn;
+    const toggleDevice = async (id) => {
+        try {
+            const response = await fetch(`${API_URL}/${id}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (response.ok) {
+                const updatedDevice = await response.json();
+                await fetchDevices();
                 addActivity(
-                    device.name, 
-                    device.type === 'thermostat'
-                        ? `${newState ? 'turned on' : 'turned off'} (${device.temperature}°F)`
-                        : (newState ? 'turned on' : 'turned off')
+                    updatedDevice.name, 
+                    updatedDevice.isOn ? 'turned on' : 'turned off'
                 );
-                return { ...device, isOn: newState };
             }
-            return device;
-        });
-        
-        deviceState = updatedDevices;
-        setDevices(updatedDevices);
-        setActivities(activityState);
-        listeners.forEach(listener => listener(updatedDevices, activityState));
+        } catch (err) {
+            console.error('Network error');
+        }
     };
 
-    const toggleAllLights = (desiredState) => {
-        const updatedDevices = devices.map(device => {
-            if (device.type === 'light') {
-                if (device.isOn !== desiredState) {
-                    addActivity(
-                        device.name,
-                        desiredState ? 'turned on' : 'turned off'
-                    );
-                    return { ...device, isOn: desiredState };
-                }
+    const toggleAllLights = async (desiredState) => {
+        try {
+            const response = await fetch(`${API_URL}/toggle-all-lights`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ desiredState })
+            });
+            
+            if (response.ok) {
+                const updatedDevices = await response.json();
+                setDevices(updatedDevices);
+                
+                updatedDevices
+                    .filter(d => d.type === 'light')
+                    .forEach(device => {
+                        addActivity(device.name, desiredState ? 'turned on' : 'turned off');
+                    });
             }
-            return device;
-        });
-
-        deviceState = updatedDevices;
-        setDevices(updatedDevices);
-        setActivities(activityState);
-        listeners.forEach(listener => listener(updatedDevices, activityState));
+        } catch (err) {
+            console.error('Network error');
+        }
     };
 
-    const setTemperature = (id, newTemp) => {
-        const updatedDevices = devices.map(device => {
-            if (device.id === id && device.type === 'thermostat') {
-                addActivity(
-                    device.name,
-                    `temperature set to ${newTemp}°F`
-                );
-                return { ...device, temperature: newTemp };
+    const setTemperature = async (id, newTemp) => {
+        try {
+            const response = await fetch(`${API_URL}/${id}/temperature`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ temperature: newTemp })
+            });
+            
+            if (response.ok) {
+                const updatedDevice = await response.json();
+                await fetchDevices();
+                addActivity(updatedDevice.name, `temperature set to ${newTemp}°F`);
             }
-            return device;
-        });
-        
-        deviceState = updatedDevices;
-        setDevices(updatedDevices);
-        setActivities(activityState);
-        listeners.forEach(listener => listener(updatedDevices, activityState));
+        } catch (err) {
+            console.error('Network error');
+        }
     };
 
-    // Subscribe to changes
-    useEffect(() => {
-        const listener = (newDevices, newActivities) => {
-            setDevices(newDevices);
-            setActivities(newActivities);
-        };
-        listeners.push(listener);
-        return () => {
-            listeners = listeners.filter(l => l !== listener);
-        };
-    }, []);
-
-    return { devices, activities, toggleDevice, toggleAllLights, setTemperature };
+    return { 
+        devices, 
+        activities, 
+        error,
+        toggleDevice, 
+        toggleAllLights, 
+        setTemperature 
+    };
 }
