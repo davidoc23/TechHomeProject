@@ -3,10 +3,16 @@ import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDevices } from '../hooks/useDevices';
 import { homeStyles } from '../styles/homeStyles'; 
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { ErrorMessage } from '../components/ui/ErrorMessage';
 
 export default function HomeScreen() {
-  const { devices, activities , toggleDevice, toggleAllLights } = useDevices();
+  const { devices, activities, error, isLoading, fetchDevices, toggleDevice, toggleAllLights } = useDevices();
 
+
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} retry={fetchDevices} />;
+  
   // Calculate quick stats
   const activeDevices = devices.filter(d => d.isOn).length;
   const totalDevices = devices.length;

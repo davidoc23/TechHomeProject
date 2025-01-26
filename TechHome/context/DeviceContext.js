@@ -15,6 +15,8 @@ export function DeviceProvider({ children }) {
     const [activities, setActivities] = useState([]);
     //State to store any error messages
     const [error, setError] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+
 
     //API endpoint for fetching device data
     const API_URL = 'http://localhost:5000/api/devices';
@@ -26,6 +28,8 @@ export function DeviceProvider({ children }) {
      * If an error occurs, it sets an appropriate error message.
      */
     const fetchDevices = async () => {
+        setIsLoading(true);
+        setError(null);
         try {
             const response = await fetch(API_URL);
             if (response.ok) {
@@ -34,6 +38,8 @@ export function DeviceProvider({ children }) {
             }
         } catch (err) {
             setError('Failed to fetch devices');
+        }  finally {
+            setIsLoading(false);
         }
     };
 
@@ -70,9 +76,11 @@ export function DeviceProvider({ children }) {
         devices,       // Current list of devices
         activities,    // Recent activity log
         error,         // Error state, if any
+        isLoading,     // Loading state
         fetchDevices,  // Function to fetch devices from the API
         addActivity,   // Function to add a user activity to the log
-        setDevices     // Exposed to allow external modification of the device list (if necessary)
+        setDevices,     // Exposed to allow external modification of the device list (if necessary)
+        setError
     };
 
 
