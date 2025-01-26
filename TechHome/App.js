@@ -6,6 +6,8 @@ import { View, Text } from 'react-native'; // Add this for temporary screens
 import DevicesScreen from './screens/DevicesScreen';
 import HomeScreen from './screens/HomeScreen';
 import { DeviceProvider } from './context/DeviceContext';
+import DeviceManagementScreen from './screens/DeviceManagementScreen';
+
 
 const AutomationScreen = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -28,6 +30,7 @@ function App() {
         <Tab.Navigator>
           <Tab.Screen name="Home" component={HomeScreen} />
           <Tab.Screen name="Devices" component={DevicesScreen} />
+          <Tab.Screen name="Manage Devices" component={DeviceManagementScreen} />
           <Tab.Screen name="Automation" component={AutomationScreen} />
           <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>

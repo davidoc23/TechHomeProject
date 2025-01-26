@@ -18,6 +18,32 @@ def get_devices():
         return jsonify(devices), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@device_routes.route('/', methods=['POST'])
+def add_device():
+    try:
+        data = request.get_json()
+        required_fields = ['name', 'type']
+        if not all(field in data for field in required_fields):
+            return jsonify({"error": "Missing required fields"}), 400
+
+        new_device = {
+            "id": len(devices) + 1,
+            "name": data['name'],
+            "type": data['type'],
+            "isOn": False
+        }
+        
+        # Add temperature field for thermostats
+        if data['type'] == 'thermostat':
+            new_device['temperature'] = 72  # Default temperature
+
+        devices.append(new_device)
+        return jsonify(new_device), 201
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @device_routes.route('/<int:device_id>/toggle', methods=['POST'])
 def toggle_device(device_id):
@@ -61,5 +87,17 @@ def set_temperature(device_id):
 
         device["temperature"] = data["temperature"]
         return jsonify(device), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@device_routes.route('/<int:device_id>', methods=['DELETE'])
+def remove_device(device_id):
+    try:
+        device = next((d for d in devices if d["id"] == device_id), None)
+        if not device:
+            return jsonify({"error": "Device not found"}), 404
+            
+        devices.remove(device)
+        return jsonify({"message": "Device removed successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

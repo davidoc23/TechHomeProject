@@ -66,12 +66,65 @@ export function useDevices() {
         }
     };
 
+    const generateDeviceId = () => {
+        const existingIds = devices.map(d => d.id);
+        let newId = 1;
+        while (existingIds.includes(newId)) {
+            newId++;
+        }
+        return newId;
+    };
+
+    const addDevice = async (deviceData) => {
+        try {
+            const newDevice = {
+                ...deviceData,
+                id: generateDeviceId(),
+                isOn: false
+            };
+    
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newDevice)
+            });
+            
+            if (response.ok) {
+                await fetchDevices();
+                addActivity(deviceData.name, 'added to system');
+            }
+        } catch (err) {
+            setError('Failed to add device');
+        }
+    };
+
+    
+    const removeDevice = async (id) => {
+        try {
+            const response = await fetch(`${API_URL}/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                const device = devices.find(d => d.id === id);
+                await fetchDevices();
+                if (device) {
+                    addActivity(device.name, 'removed from system');
+                }
+            }
+        } catch (err) {
+            setError('Failed to remove device');
+        }
+    };
+
     return { 
         devices, 
         activities, 
         error,
         toggleDevice, 
         toggleAllLights, 
-        setTemperature 
+        setTemperature,
+        addDevice,
+        removeDevice, 
     };
 }
