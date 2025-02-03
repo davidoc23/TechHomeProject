@@ -9,6 +9,7 @@ const DeviceContext = createContext();
  * essential functions for fetching data and managing activities.
  */
 export function DeviceProvider({ children }) {
+    //State Management
     //State to store the list of devices
     const [devices, setDevices] = useState([]);
     //State to store recent user activities (e.g., device toggles)
@@ -16,10 +17,11 @@ export function DeviceProvider({ children }) {
     //State to store any error messages
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [rooms, setRooms] = useState([]);
 
 
-    //API endpoint for fetching device data
-    const API_URL = 'http://localhost:5000/api/devices';
+     // API endpoints
+     const API_URL = 'http://localhost:5000/api';
 
 
      /**
@@ -31,7 +33,7 @@ export function DeviceProvider({ children }) {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch(API_URL);
+            const response = await fetch(`${API_URL}/devices`);
             if (response.ok) {
                 const data = await response.json();//Parse the JSON response
                 setDevices(data);//Update the devices state
@@ -43,12 +45,27 @@ export function DeviceProvider({ children }) {
         }
     };
 
+    /**
+     * Fetches the list of rooms from the backend API.
+     */
+    const fetchRooms = async () => {
+        try {
+            const response = await fetch(`${API_URL}/rooms`);
+            if (response.ok) {
+                const data = await response.json();
+                setRooms(data);
+            }
+        } catch (err) {
+            setError('Failed to fetch rooms');
+        }
+    };
 
     /**
      * useEffect to fetch the list of devices once on component mount.
      * Dependencies: Empty array means this effect runs only once.
      */
     useEffect(() => {
+        fetchRooms();
         fetchDevices();
     }, []);
 
@@ -71,15 +88,32 @@ export function DeviceProvider({ children }) {
         setActivities(prev => [newActivity, ...prev].slice(0, 5));
     };
 
+
+    /**
+     * Gets devices for a specific room
+     * @param {string} roomId - ID of the room
+     */
+    const getDevicesByRoom = (roomId) => {
+        return devices.filter(device => device.roomId === roomId);
+    };
+
+
     // Context value containing state and actions exposed to components
     const value = {
+        // State
         devices,       // Current list of devices
+        rooms,         // Current list of rooms
         activities,    // Recent activity log
         error,         // Error state, if any
         isLoading,     // Loading state
+        // Functions
         fetchDevices,  // Function to fetch devices from the API
+        fetchRooms,    // Function to fetch rooms from the API
         addActivity,   // Function to add a user activity to the log
+        getDevicesByRoom, // Function to get devices for a specific room
+        // State setters
         setDevices,     // Exposed to allow external modification of the device list (if necessary)
+        setRooms,       // Exposed to allow external modification of the room list (if necessary)
         setError
     };
 

@@ -7,21 +7,24 @@ import { useDevices } from '../hooks/useDevices';
 import { deviceManagementStyles } from '../styles/deviceManagementStyles';
 
 export default function DeviceManagementScreen() {
-  const { devices, error, isLoading, addDevice, removeDevice } = useDevices();
+  const { devices, rooms, error, isLoading, addDevice, removeDevice } = useDevices();
   const [deviceName, setDeviceName] = useState('');
   const [deviceType, setDeviceType] = useState('light');
+  const [selectedRoomId, setSelectedRoomId] = useState('');
 
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} />;
 
   const handleAddDevice = () => {
-    if (deviceName.trim()) {
+    if (deviceName.trim() && selectedRoomId) {
       addDevice({
         name: deviceName,
-        type: deviceType
+        type: deviceType,
+        roomId: selectedRoomId
       });
       setDeviceName('');
       setDeviceType('light');
+      setSelectedRoomId('');
     }
   };
 
@@ -35,7 +38,7 @@ export default function DeviceManagementScreen() {
           value={deviceName}
           onChangeText={setDeviceName}
           placeholder="Device Name"
-          placeholderTextColor="#666"
+          placeholderTextColor="#566"
         />
 
         <Picker
@@ -46,9 +49,27 @@ export default function DeviceManagementScreen() {
           <Picker.Item label="Thermostat" value="thermostat" />
         </Picker>
 
+        <Picker
+          selectedValue={selectedRoomId}
+          onValueChange={setSelectedRoomId}
+          style={deviceManagementStyles.picker}>
+          <Picker.Item label="Select a room" value="" />
+          {rooms.map(room => (
+            <Picker.Item 
+              key={room.id} 
+              label={room.name} 
+              value={room.id} 
+            />
+          ))}
+        </Picker>
+
         <TouchableOpacity 
-          style={deviceManagementStyles.addButton}
-          onPress={handleAddDevice}>
+          style={[
+            deviceManagementStyles.addButton,
+            (!deviceName.trim() || !selectedRoomId) && deviceManagementStyles.addButtonDisabled
+          ]}
+          onPress={handleAddDevice}
+          disabled={!deviceName.trim() || !selectedRoomId}>
           <Text style={deviceManagementStyles.buttonText}>Add Device</Text>
         </TouchableOpacity>
       </View>
