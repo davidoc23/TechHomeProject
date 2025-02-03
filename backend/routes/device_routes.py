@@ -1,21 +1,17 @@
 from flask import Blueprint, jsonify, request
-from flask_cors import CORS
+from bson import ObjectId
+from db import devices_collection
 
 device_routes = Blueprint('devices', __name__)
-CORS(device_routes)
-
-# Initial device state
-devices = [
-    {"id": 1, "name": "Living Room Light", "type": "light", "isOn": False},
-    {"id": 2, "name": "Kitchen Light", "type": "light", "isOn": False},
-    {"id": 3, "name": "Bedroom Light", "type": "light", "isOn": False},
-    {"id": 4, "name": "Living Room Thermostat", "type": "thermostat", "temperature": 72, "isOn": True}
-]
 
 @device_routes.route('/', methods=['GET'])
 def get_devices():
     try:
-        return jsonify(devices), 200
+        devices = list(devices_collection.find())
+        for device in devices:
+            device['id'] = str(device['_id'])
+            del device['_id']
+        return jsonify(devices)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
@@ -24,36 +20,44 @@ def get_devices():
 def add_device():
     try:
         data = request.get_json()
-        required_fields = ['name', 'type']
-        if not all(field in data for field in required_fields):
-            return jsonify({"error": "Missing required fields"}), 400
-
         new_device = {
-            "id": len(devices) + 1,
             "name": data['name'],
             "type": data['type'],
             "isOn": False
         }
         
-        # Add temperature field for thermostats
-        if data['type'] == 'thermostat':
-            new_device['temperature'] = 72  # Default temperature
-
-        devices.append(new_device)
-        return jsonify(new_device), 201
-
+        # Insert and get the new device
+        result = devices_collection.insert_one(new_device)
+        inserted_device = devices_collection.find_one({"_id": result.inserted_id})
+        
+        # Format for response
+        inserted_device['id'] = str(inserted_device['_id'])
+        del inserted_device['_id']
+        
+        return jsonify(inserted_device), 201
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error: {str(e)}")  # Debug log
+        return jsonify({"error": "Failed to add device"}), 500
+    
 
-@device_routes.route('/<int:device_id>/toggle', methods=['POST'])
+@device_routes.route('/<device_id>/toggle', methods=['POST'])
 def toggle_device(device_id):
     try:
-        device = next((d for d in devices if d["id"] == device_id), None)
+        device = devices_collection.find_one({"_id": ObjectId(device_id)})
         if not device:
             return jsonify({"error": "Device not found"}), 404
             
-        device["isOn"] = not device["isOn"]
-        return jsonify(device), 200
+        new_state = not device['isOn']
+        devices_collection.update_one(
+            {"_id": ObjectId(device_id)},
+            {"$set": {"isOn": new_state}}
+        )
+        
+        device['isOn'] = new_state
+        device['id'] = str(device['_id'])
+        del device['_id']
+        
+        return jsonify(device)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -63,41 +67,55 @@ def toggle_all_lights():
         data = request.get_json()
         if 'desiredState' not in data:
             return jsonify({"error": "Desired state required"}), 400
-            
+
+        devices_collection.update_many(
+            {"type": "light"},
+            {"$set": {"isOn": data['desiredState']}}
+        )
+        
+        devices = list(devices_collection.find({"type": "light"}))
         for device in devices:
-            if device['type'] == 'light':
-                device['isOn'] = data['desiredState']
-                
+            device['id'] = str(device['_id'])
+            del device['_id']
+            
         return jsonify(devices), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@device_routes.route('/<int:device_id>/temperature', methods=['POST'])
+@device_routes.route('/<device_id>/temperature', methods=['POST'])
 def set_temperature(device_id):
     try:
         data = request.get_json()
         if not data or 'temperature' not in data:
-            return jsonify({"error": "Temperature value required"}), 400
+            return jsonify({"error": "Temperature required"}), 400
 
-        device = next((d for d in devices if d["id"] == device_id), None)
+        device = devices_collection.find_one({"_id": ObjectId(device_id)})
         if not device:
             return jsonify({"error": "Device not found"}), 404
-        if device["type"] != "thermostat":
-            return jsonify({"error": "Device is not a thermostat"}), 400
+        if device['type'] != 'thermostat':
+            return jsonify({"error": "Not a thermostat"}), 400
 
-        device["temperature"] = data["temperature"]
-        return jsonify(device), 200
+        devices_collection.update_one(
+            {"_id": ObjectId(device_id)},
+            {"$set": {"temperature": data['temperature']}}
+        )
+        
+        device['temperature'] = data['temperature']
+        device['id'] = str(device['_id'])
+        del device['_id']
+        
+        return jsonify(device)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
-@device_routes.route('/<int:device_id>', methods=['DELETE'])
+
+    
+@device_routes.route('/<device_id>', methods=['DELETE'])
 def remove_device(device_id):
     try:
-        device = next((d for d in devices if d["id"] == device_id), None)
-        if not device:
-            return jsonify({"error": "Device not found"}), 404
-            
-        devices.remove(device)
-        return jsonify({"message": "Device removed successfully"}), 200
+        result = devices_collection.delete_one({"_id": ObjectId(device_id)})
+        if result.deleted_count:
+            return jsonify({"message": "Device removed"}), 200
+        return jsonify({"error": "Device not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
