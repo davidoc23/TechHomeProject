@@ -1,13 +1,14 @@
 import { useDeviceContext } from '../context/DeviceContext';
 
 const API_URL = 'http://localhost:5000/api/devices';
+const ROOMS_API_URL = 'http://localhost:5000/api/rooms';
 
 /**
  * Hook for managing device operations
  * Implements device-specific logic while using DeviceContext for state management
  */
 export function useDevices() {
-    const { devices, rooms, activities, error, fetchDevices, addActivity, setDevices, setError  } = useDeviceContext();
+    const { devices, rooms, activities, error, fetchDevices, fetchRooms, addActivity, setDevices, setError  } = useDeviceContext();
 
       /**
      * Toggles a device's state
@@ -140,6 +141,52 @@ export function useDevices() {
         }
     };
 
+    const addRoom = async (roomData) => {
+        try {
+            const response = await fetch(ROOMS_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(roomData)
+            });
+            
+            if (response.ok) {
+                await fetchRooms();
+            }
+        } catch (err) {
+            setError('Failed to add room');
+        }
+    };
+
+    const removeRoom = async (id) => {
+        try {
+            const response = await fetch(`${ROOMS_API_URL}/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                await fetchRooms();
+            }
+        } catch (err) {
+            setError('Failed to remove room');
+        }
+    };
+
+    const editRoom = async (id, roomData) => {
+        try {
+            const response = await fetch(`${ROOMS_API_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(roomData)
+            });
+            
+            if (response.ok) {
+                await fetchRooms();
+            }
+        } catch (err) {
+            setError('Failed to edit room');
+        }
+    };
+
     return { 
         devices, 
         rooms,    
@@ -150,5 +197,8 @@ export function useDevices() {
         setTemperature,
         addDevice,
         removeDevice, 
+        addRoom,
+        removeRoom,
+        editRoom
     };
 }

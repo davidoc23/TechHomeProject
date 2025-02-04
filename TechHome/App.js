@@ -7,6 +7,8 @@ import DevicesScreen from './screens/DevicesScreen';
 import HomeScreen from './screens/HomeScreen';
 import { DeviceProvider } from './context/DeviceContext';
 import DeviceManagementScreen from './screens/DeviceManagementScreen';
+import RoomManagementScreen from './screens/RoomManagementScreen';
+
 
 
 const AutomationScreen = () => (
@@ -31,6 +33,7 @@ function App() {
           <Tab.Screen name="Home" component={HomeScreen} />
           <Tab.Screen name="Devices" component={DevicesScreen} />
           <Tab.Screen name="Manage Devices" component={DeviceManagementScreen} />
+          <Tab.Screen name="Manage Rooms" component={RoomManagementScreen} />
           <Tab.Screen name="Automation" component={AutomationScreen} />
           <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
