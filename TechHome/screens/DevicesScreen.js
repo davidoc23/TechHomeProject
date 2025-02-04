@@ -8,7 +8,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ErrorMessage } from '../components/ui/ErrorMessage';
 
 export default function DevicesScreen() {
-  const { devices, error, isLoading, fetchDevices, toggleDevice, setTemperature, toggleAllLights } = useDevices();
+  const { devices, rooms, error, isLoading, fetchDevices, toggleDevice, setTemperature, toggleAllLights } = useDevices();
 
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} retry={fetchDevices} />;
@@ -41,12 +41,16 @@ export default function DevicesScreen() {
       </View>
       
       {devices.map(device => (
-        <DeviceCard 
-          key={device.id} 
-          device={device} 
-          onToggle={toggleDevice} 
-          onTemperatureChange={setTemperature}
-        />
+        <View key={device.id}>
+          <Text style={deviceStyles.roomLabel}>
+            {rooms.find(r => r.id === device.roomId)?.name || 'No Room'}
+          </Text>
+          <DeviceCard 
+            device={device}
+            onToggle={toggleDevice}
+            onTemperatureChange={setTemperature}
+          />
+        </View>
       ))}
     </ScrollView>
   );

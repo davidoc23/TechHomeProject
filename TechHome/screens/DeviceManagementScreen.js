@@ -78,16 +78,18 @@ export default function DeviceManagementScreen() {
         <Text style={deviceManagementStyles.title}>Current Devices</Text>
         {devices.map(device => (
           <View key={device.id} style={deviceManagementStyles.deviceItem}>
-            <View style={deviceManagementStyles.deviceInfo}>
-              <Text style={deviceManagementStyles.deviceName}>{device.name}</Text>
-              <Text style={deviceManagementStyles.deviceType}>{device.type}</Text>
-            </View>
-            <TouchableOpacity 
-              style={deviceManagementStyles.removeButton}
-              onPress={() => removeDevice(device.id)}>
-              <Text style={deviceManagementStyles.removeButtonText}>Remove</Text>
-            </TouchableOpacity>
+          <View style={deviceManagementStyles.deviceInfo}>
+            <Text style={deviceManagementStyles.deviceName}>{device.name}</Text>
+            <Text style={deviceManagementStyles.deviceDetails}>
+              {device.type} • {rooms.find(r => r.id === device.roomId)?.name || 'No Room'}
+            </Text>
           </View>
+          <TouchableOpacity 
+            style={deviceManagementStyles.removeButton}
+            onPress={() => removeDevice(device.id)}>
+            <Text style={deviceManagementStyles.removeButtonText}>Remove</Text>
+          </TouchableOpacity>
+        </View>
         ))}
       </View>
     </ScrollView>

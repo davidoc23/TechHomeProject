@@ -70,5 +70,10 @@ export const deviceManagementStyles = StyleSheet.create({
   removeButtonText: {
     color: 'white',
     fontSize: 14
-  }
+  },
+  deviceDetails: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4
+}
 });
