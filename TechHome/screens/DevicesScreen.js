@@ -16,6 +16,10 @@ export default function DevicesScreen() {
   const activeDevices = devices.filter(d => d.isOn).length;
   const lightDevices = devices.filter(d => d.type === 'light');
   const anyLightOn = lightDevices.some(d => d.isOn);
+  const devicesByRoom = rooms.map(room => ({
+    ...room,
+    devices: devices.filter(device => device.roomId === room.id)
+  }));
 
   const handleToggleAllLights = () => {
     toggleAllLights(!anyLightOn);
@@ -40,16 +44,18 @@ export default function DevicesScreen() {
         )}
       </View>
       
-      {devices.map(device => (
-        <View key={device.id}>
-          <Text style={deviceStyles.roomLabel}>
-            {rooms.find(r => r.id === device.roomId)?.name || 'No Room'}
-          </Text>
-          <DeviceCard 
-            device={device}
-            onToggle={toggleDevice}
-            onTemperatureChange={setTemperature}
-          />
+    
+      {devicesByRoom.map(room => (
+        <View key={room.id} style={deviceStyles.roomSection}>
+          <Text style={deviceStyles.roomTitle}>{room.name}</Text>
+          {room.devices.map(device => (
+            <DeviceCard
+              key={device.id}
+              device={device}
+              onToggle={toggleDevice}
+              onTemperatureChange={setTemperature}
+            />
+          ))}
         </View>
       ))}
     </ScrollView>
