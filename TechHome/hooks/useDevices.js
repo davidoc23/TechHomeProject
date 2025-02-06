@@ -2,13 +2,15 @@ import { useDeviceContext } from '../context/DeviceContext';
 
 const API_URL = 'http://localhost:5000/api/devices';
 const ROOMS_API_URL = 'http://localhost:5000/api/rooms';
+const AUTOMATIONS_API_URL = 'http://localhost:5000/api/automations';
+
 
 /**
  * Hook for managing device operations
  * Implements device-specific logic while using DeviceContext for state management
  */
 export function useDevices() {
-    const { devices, rooms, activities, error, fetchDevices, fetchRooms, addActivity, setDevices, setError  } = useDeviceContext();
+    const { devices, rooms,  automations, activities, error, fetchDevices, fetchAutomations, fetchRooms, addActivity, setDevices, setError  } = useDeviceContext();
 
       /**
      * Toggles a device's state
@@ -187,6 +189,23 @@ export function useDevices() {
         }
     };
 
+    const addAutomation = async (automationData) => {
+        try {
+            const response = await fetch(AUTOMATIONS_API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(automationData)
+            });
+            
+            if (response.ok) {
+                await fetchAutomations();
+                addActivity('Automation', `Added "${automationData.name}"`);
+            }
+        } catch (err) {
+            setError('Failed to add automation');
+        }
+    };
+
     return { 
         devices, 
         rooms,    
@@ -198,6 +217,7 @@ export function useDevices() {
         addDevice,
         removeDevice, 
         addRoom,
+        addAutomation,
         removeRoom,
         editRoom
     };

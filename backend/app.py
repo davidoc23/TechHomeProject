@@ -2,6 +2,8 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from routes.device_routes import device_routes
 from routes.room_routes import room_routes
+from routes.automation_routes import automation_routes
+
 
 
 app = Flask(__name__)
@@ -15,6 +17,7 @@ def home():
         "endpoints": {
             "devices": "/api/devices",
             "rooms": "/api/rooms",
+            "automations": "/api/automations",
             "devices_by_room": "/api/devices/by-room/<room_id>",
             "toggle": "/api/devices/<id>/toggle",
             "temperature": "/api/devices/<id>/temperature",
@@ -24,6 +27,8 @@ def home():
 
 app.register_blueprint(device_routes, url_prefix='/api/devices')
 app.register_blueprint(room_routes, url_prefix='/api/rooms')
+app.register_blueprint(automation_routes, url_prefix='/api/automations')
+
 
 
 if __name__ == '__main__':
