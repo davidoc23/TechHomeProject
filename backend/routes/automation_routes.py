@@ -74,4 +74,15 @@ def update_automation(automation_id):
         return jsonify({"error": "Automation not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@automation_routes.route('/<automation_id>', methods=['DELETE'])
+def delete_automation(automation_id):
+    try:
+        result = automations_collection.delete_one({"_id": ObjectId(automation_id)})
+        if result.deleted_count:
+            return jsonify({"message": "Automation deleted successfully"}), 200
+        return jsonify({"error": "Automation not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
