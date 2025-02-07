@@ -48,3 +48,30 @@ def create_automation():
         return jsonify(new_automation), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@automation_routes.route('/<automation_id>', methods=['PUT'])
+def update_automation(automation_id):
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Convert device IDs to ObjectId
+        if 'deviceId' in data:
+            data['deviceId'] = ObjectId(data['deviceId'])
+
+        result = automations_collection.update_one(
+            {"_id": ObjectId(automation_id)},
+            {"$set": data}
+        )
+
+        if result.modified_count:
+            automation = automations_collection.find_one({"_id": ObjectId(automation_id)})
+            automation['id'] = str(automation['_id'])
+            del automation['_id']
+            return jsonify(automation)
+        return jsonify({"error": "Automation not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
