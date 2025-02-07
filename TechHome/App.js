@@ -8,14 +8,8 @@ import HomeScreen from './screens/HomeScreen';
 import { DeviceProvider } from './context/DeviceContext';
 import DeviceManagementScreen from './screens/DeviceManagementScreen';
 import RoomManagementScreen from './screens/RoomManagementScreen';
+import AutomationScreen from './screens/AutomationScreen';
 
-
-
-const AutomationScreen = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>Automation Screen</Text>
-  </View>
-);
 
 const SettingsScreen = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
