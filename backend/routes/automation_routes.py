@@ -85,4 +85,22 @@ def delete_automation(automation_id):
         return jsonify({"error": "Automation not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@automation_routes.route('/<automation_id>/toggle', methods=['POST'])
+def toggle_automation(automation_id):
+    try:
+        automation = automations_collection.find_one({"_id": ObjectId(automation_id)})
+        if not automation:
+            return jsonify({"error": "Automation not found"}), 404
+
+        new_state = not automation.get('enabled', True)
+        automations_collection.update_one(
+            {"_id": ObjectId(automation_id)},
+            {"$set": {"enabled": new_state}}
+        )
+        
+        return jsonify({"enabled": new_state}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
