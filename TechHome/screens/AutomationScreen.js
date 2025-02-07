@@ -60,6 +60,79 @@ export default function AutomationScreen() {
           <Picker.Item label="Device-linked" value="device-link" />
         </Picker>
 
+
+        {automationType === 'time' && (
+          <TextInput
+            style={automationStyles.input}
+            value={timeCondition}
+            onChangeText={setTimeCondition}
+            placeholder="Time (HH:MM)"
+            placeholderTextColor="#666"
+          />
+        )}
+
+        <Picker
+          selectedValue={selectedDevice}
+          onValueChange={setSelectedDevice}
+          style={automationStyles.picker}>
+          <Picker.Item label="Select Device" value="" />
+          {devices.map(device => (
+            <Picker.Item 
+              key={device.id} 
+              label={`${device.name} (${rooms.find(r => r.id === device.roomId)?.name})`}
+              value={device.id} 
+            />
+          ))}
+        </Picker>
+
+        <Picker
+          selectedValue={selectedAction}
+          onValueChange={setSelectedAction}
+          style={automationStyles.picker}>
+          <Picker.Item label="Toggle" value="toggle" />
+          <Picker.Item label="Turn On" value="turn_on" />
+          <Picker.Item label="Turn Off" value="turn_off" />
+          {selectedDevice && devices.find(d => d.id === selectedDevice)?.type === 'thermostat' && (
+            <Picker.Item label="Set Temperature" value="set_temperature" />
+          )}
+        </Picker>
+
+        <TouchableOpacity 
+          style={automationStyles.addButton}
+          onPress={handleAddAutomation}>
+          <Text style={automationStyles.buttonText}>Add Automation</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={automationStyles.section}>
+        <Text style={automationStyles.title}>Current Automations</Text>
+        {automations?.map(automation => (
+          <View key={automation.id} style={automationStyles.automationItem}>
+            <View style={automationStyles.automationInfo}>
+              <Text style={automationStyles.automationName}>{automation.name}</Text>
+              <Text style={automationStyles.automationType}>
+                {automation.type === 'time' ? 'Time-based' : 'Device-linked'}
+              </Text>
+            </View>
+            <View style={automationStyles.automationActions}>
+              <TouchableOpacity 
+                style={[
+                  automationStyles.toggleButton,
+                  automation.enabled && automationStyles.toggleButtonEnabled
+                ]}
+                onPress={() => toggleAutomation(automation.id)}>
+                <Text style={automationStyles.toggleButtonText}>
+                  {automation.enabled ? 'Enabled' : 'Disabled'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={automationStyles.removeButton}
+                onPress={() => removeAutomation(automation.id)}>
+                <Text style={automationStyles.removeButtonText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
         
       </View>
     </ScrollView>
