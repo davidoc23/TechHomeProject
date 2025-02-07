@@ -52,6 +52,14 @@ export default function AutomationScreen() {
           placeholderTextColor="#666"
         />
 
+        <Picker
+          selectedValue={automationType}
+          onValueChange={setAutomationType}
+          style={automationStyles.picker}>
+          <Picker.Item label="Time-based" value="time" />
+          <Picker.Item label="Device-linked" value="device-link" />
+        </Picker>
+
         
       </View>
     </ScrollView>
