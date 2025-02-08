@@ -18,6 +18,7 @@ export function DeviceProvider({ children }) {
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [rooms, setRooms] = useState([]);
+    const [automations, setAutomations] = useState([]);
 
 
      // API endpoints
@@ -60,6 +61,19 @@ export function DeviceProvider({ children }) {
         }
     };
 
+
+    const fetchAutomations = async () => {
+        try {
+            const response = await fetch(`${API_URL}/automations`);
+            if (response.ok) {
+                const data = await response.json();
+                setAutomations(data);
+            }
+        } catch (err) {
+            setError('Failed to fetch automations');
+        }
+    };
+
     /**
      * useEffect to fetch the list of devices once on component mount.
      * Dependencies: Empty array means this effect runs only once.
@@ -67,6 +81,7 @@ export function DeviceProvider({ children }) {
     useEffect(() => {
         fetchRooms();
         fetchDevices();
+        fetchAutomations();
     }, []);
 
 
@@ -103,12 +118,14 @@ export function DeviceProvider({ children }) {
         // State
         devices,       // Current list of devices
         rooms,         // Current list of rooms
+        automations,   // Current list of automations
         activities,    // Recent activity log
         error,         // Error state, if any
         isLoading,     // Loading state
         // Functions
         fetchDevices,  // Function to fetch devices from the API
         fetchRooms,    // Function to fetch rooms from the API
+        fetchAutomations, // Function to fetch automations from the API
         addActivity,   // Function to add a user activity to the log
         getDevicesByRoom, // Function to get devices for a specific room
         // State setters
