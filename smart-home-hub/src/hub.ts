@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Define the base URL for the backend server
 // You can replace '0.0.0.0' with the actual IP address of your laptop (if needed)
-const BACKEND_URL = 'http://0.0.0.0:5000';
+const BACKEND_URL = 'http://192.168.1.144:5000';
 
 // Function to fetch the list of devices from the backend
 export async function getDevices() {
