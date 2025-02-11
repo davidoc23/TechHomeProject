@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Define the base URL for the backend server
-// You can replace '0.0.0.0' with the actual IP address of your laptop (if needed)
+// You can replace this ip with the actual IP address of your laptop (if needed)
 const BACKEND_URL = 'http://192.168.1.144:5000';
 
 // Function to fetch the list of devices from the backend
@@ -52,8 +52,7 @@ export async function deleteDevice(deviceId: any) {
 // Function to manage a device
 export function manageDevice(device: { id: number; name: string; status: string; room: string; }) {
     console.log(`Managing device: ${device.name} in room: ${device.room}`);
-    // Add logic to manage the device based on its status
-    // For example, turning on/off a light
+    // For example, turning on or off a light.
 }
 
 // Function to poll the backend for device updates at a specified interval
