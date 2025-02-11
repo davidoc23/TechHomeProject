@@ -206,9 +206,50 @@ export function useDevices() {
         }
     };
 
+    const removeAutomation = async (id) => {
+        try {
+            const response = await fetch(`${AUTOMATIONS_API_URL}/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                const automation = automations.find(a => a.id === id);
+                await fetchAutomations();
+                if (automation) {
+                    addActivity('Automation', `Removed "${automation.name}"`);
+                }
+            }
+        } catch (err) {
+            setError('Failed to remove automation');
+        }
+    };
+
+    const toggleAutomation = async (id) => {
+        try {
+            const response = await fetch(`${AUTOMATIONS_API_URL}/${id}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (response.ok) {
+                await fetchAutomations();
+                const automation = automations.find(a => a.id === id);
+                if (automation) {
+                    addActivity(
+                        'Automation',
+                        `${automation.name} ${automation.enabled ? 'disabled' : 'enabled'}`
+                    );
+                }
+            }
+        } catch (err) {
+            setError('Failed to toggle automation');
+        }
+    };
+
     return { 
         devices, 
-        rooms,    
+        rooms,
+        automations,     
         activities, 
         error,
         toggleDevice, 
@@ -217,8 +258,11 @@ export function useDevices() {
         addDevice,
         removeDevice, 
         addRoom,
-        addAutomation,
         removeRoom,
-        editRoom
+        editRoom,
+        addAutomation,
+        removeAutomation,
+        toggleAutomation
+
     };
 }
