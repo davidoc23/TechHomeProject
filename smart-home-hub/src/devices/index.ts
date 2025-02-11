@@ -6,5 +6,4 @@ export interface Device {
 
 export function manageDevice(device: Device) {
     console.log(`Managing device: ${device.name}`);
-    // Add logic to manage the device
 }
