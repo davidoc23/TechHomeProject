@@ -17,7 +17,7 @@ export function useDevices() {
      * @param {string} id - Device ID
      */
     const toggleDevice = async (id) => {
-    try {
+    try {//added /devices/ to enable real-time updates fro leon(Jarvis)
         const response = await fetch(`${API_URL}/devices/${id}/toggle`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
