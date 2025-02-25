@@ -84,7 +84,16 @@ export function DeviceProvider({ children }) {
         fetchAutomations();
     }, []);
 
-
+    useEffect(() => {
+        // Set up polling interval to refresh devices
+        if (Date.now() - lastCommandTime < 30000) {
+            const interval = setInterval(() => {
+                fetchDevices();
+            }, 3000);
+            
+            return () => clearInterval(interval);
+        }
+    }, [lastCommandTime]);
     /**
      * Adds a new activity to the activities log.
      * Activities represent user actions on devices, e.g., toggling a light.

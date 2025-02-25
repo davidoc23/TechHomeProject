@@ -17,26 +17,27 @@ export function useDevices() {
      * @param {string} id - Device ID
      */
     const toggleDevice = async (id) => {
-        try {
-            const response = await fetch(`${API_URL}/${id}/toggle`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            
-            if (response.ok) {
-                const updatedDevice = await response.json();
-                setDevices(prev => prev.map(device => 
-                    device.id === id ? updatedDevice : device
-                ));
-                addActivity(
-                    updatedDevice.name, 
-                    updatedDevice.isOn ? 'turned on' : 'turned off'
-                );
-            }
-        } catch (err) {
-            console.error('Network error');
+    try {
+        const response = await fetch(`${API_URL}/devices/${id}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            const updatedDevice = await response.json();
+            // Update local state immediately
+            setDevices(prev => prev.map(device => 
+                device.id === id ? updatedDevice : device
+            ));
+            addActivity(
+                updatedDevice.name, 
+                updatedDevice.isOn ? 'turned on' : 'turned off'
+            );
         }
-    };
+    } catch (err) {
+        console.error('Network error');
+    }
+};
 
     /**
      * Toggles all light devices
