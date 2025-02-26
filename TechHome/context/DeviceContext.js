@@ -19,6 +19,8 @@ export function DeviceProvider({ children }) {
     const [isLoading, setIsLoading] = useState(false);
     const [rooms, setRooms] = useState([]);
     const [automations, setAutomations] = useState([]);
+    const [lastCommandTime, setLastCommandTime] = useState(Date.now());  
+
 
 
      // API endpoints
