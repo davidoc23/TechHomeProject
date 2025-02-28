@@ -9,12 +9,13 @@ import { deviceManagementStyles } from '../styles/deviceManagementStyles';
 
 export default function DeviceManagementScreen() {
   const { devices, rooms, error, isLoading, addDevice, removeDevice } = useDevices();
-  const { haDevices, isLoading: haLoading, error: haError } = useHomeAssistantDevices();
+  const { haDevices, isLoading: haLoading, error: haError, fetchDevices: fetchHaDevices } = useHomeAssistantDevices();
   const [deviceName, setDeviceName] = useState('');
   const [deviceType, setDeviceType] = useState('light');
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedHaDevice, setSelectedHaDevice] = useState(null);
+  const [showHaDevices, setShowHaDevices] = useState(false);
 
   if (isLoading || haLoading) return <LoadingSpinner />;
   if (error || haError) return <ErrorMessage message={error || haError} />;
@@ -46,6 +47,13 @@ export default function DeviceManagementScreen() {
   const filteredDevices = haDevices.filter(device =>
     device.attributes.friendly_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleShowHaDevices = () => {
+    setShowHaDevices(!showHaDevices);
+    if (!showHaDevices) {
+      fetchHaDevices();
+    }
+  };
 
   return (
     <ScrollView style={deviceManagementStyles.container}>
@@ -113,29 +121,39 @@ export default function DeviceManagementScreen() {
       </View>
 
       <View style={deviceManagementStyles.section}>
-        <Text style={deviceManagementStyles.title}>Home Assistant Devices</Text>
-        <TextInput
-          style={deviceManagementStyles.input}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search Devices"
-          placeholderTextColor="#566"
-        />
-        {filteredDevices.map(device => (
-          <View key={device.entity_id} style={deviceManagementStyles.deviceItem}>
-            <View style={deviceManagementStyles.deviceInfo}>
-              <Text style={deviceManagementStyles.deviceName}>{device.attributes.friendly_name}</Text>
-              <Text style={deviceManagementStyles.deviceDetails}>
-                {device.entity_id} • {device.state}
-              </Text>
-            </View>
-            <TouchableOpacity 
-              style={deviceManagementStyles.addButton}
-              onPress={() => handleSelectHaDevice(device)}>
-              <Text style={deviceManagementStyles.buttonText}>Add to My Devices</Text>
-            </TouchableOpacity>
+        <TouchableOpacity 
+          style={deviceManagementStyles.addButton}
+          onPress={handleShowHaDevices}>
+          <Text style={deviceManagementStyles.buttonText}>
+            {showHaDevices ? 'Hide Home Assistant Devices' : 'Show Home Assistant Devices'}
+          </Text>
+        </TouchableOpacity>
+        {showHaDevices && (
+          <View>
+            <TextInput
+              style={deviceManagementStyles.input}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search Devices"
+              placeholderTextColor="#566"
+            />
+            {filteredDevices.map(device => (
+              <View key={device.entity_id} style={deviceManagementStyles.deviceItem}>
+                <View style={deviceManagementStyles.deviceInfo}>
+                  <Text style={deviceManagementStyles.deviceName}>{device.attributes.friendly_name}</Text>
+                  <Text style={deviceManagementStyles.deviceDetails}>
+                    {device.entity_id} • {device.state}
+                  </Text>
+                </View>
+                <TouchableOpacity 
+                  style={deviceManagementStyles.addButton}
+                  onPress={() => handleSelectHaDevice(device)}>
+                  <Text style={deviceManagementStyles.buttonText}>Add to My Devices</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
           </View>
-        ))}
+        )}
       </View>
     </ScrollView>
   );

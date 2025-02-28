@@ -6,20 +6,21 @@ export function useHomeAssistantDevices() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const response = await axios.get('http://localhost:5000/api/home-assistant/states');
-        setHaDevices(response.data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchDevices = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get('http://localhost:5000/api/home-assistant/states');
+      setHaDevices(response.data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchDevices();
   }, []);
 
-  return { haDevices, isLoading, error };
+  return { haDevices, isLoading, error, fetchDevices };
 }
