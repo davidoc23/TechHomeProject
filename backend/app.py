@@ -3,6 +3,7 @@ from flask_cors import CORS
 from routes.device_routes import device_routes
 from routes.room_routes import room_routes
 from routes.automation_routes import automation_routes
+from routes.home_assistant_routes import home_assistant_routes  # Import the new route
 
 
 
@@ -28,6 +29,7 @@ def home():
 app.register_blueprint(device_routes, url_prefix='/api/devices')
 app.register_blueprint(room_routes, url_prefix='/api/rooms')
 app.register_blueprint(automation_routes, url_prefix='/api/automations')
+app.register_blueprint(home_assistant_routes, url_prefix='/api/home-assistant')  # Register the new route
 
 
 
