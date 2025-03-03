@@ -9,70 +9,92 @@ const DEVICES_API_URL = 'http://localhost:5000/api/devices';
 /**
  * Hook for managing device operations
  * Implements device-specific logic while using DeviceContext for state management
- */
+*/
 export function useDevices() {
     const { devices, rooms,  automations, activities, error, fetchDevices, fetchAutomations, fetchRooms, addActivity, setDevices, setError  } = useDeviceContext();
 
-      /**
+    /**
      * Toggles a device's state
      * @param {string} id - Device ID
-     */
-      const toggleDevice = async (id) => {
+    */
+    const toggleDevice = async (id) => {
+        // DEBUG - console.log(`🔄 Toggling device: ${id}`);
+    
         try {
             const response = await fetch(`${DEVICES_API_URL}/${id}/toggle`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
-            
+    
             if (response.ok) {
-                const updatedDevice = await response.json();
-                setDevices(prev => prev.map(device => 
-                    device.id === id ? updatedDevice : device
-                ));
-                addActivity(
-                    updatedDevice.name, 
-                    updatedDevice.isOn ? 'turned on' : 'turned off'
+                const updatedDevice = await response.json();  // ✅ Ensure we receive a response
+                // DEBUG - console.log(`✅ Device toggled successfully: ${JSON.stringify(updatedDevice)}`);
+    
+                // Update state properly
+                setDevices(prevDevices =>
+                    prevDevices.map(device =>
+                        device.id === id ? { ...device, isOn: updatedDevice.isOn } : device
+                    )
                 );
+    
+                addActivity(updatedDevice.name, updatedDevice.isOn ? 'turned on' : 'turned off');
+            } else {
+                const errorData = await response.json();
+                // DEBUG - console.error(`❌ Error toggling device: ${errorData.error}`);
+                setError(errorData.error || 'Failed to toggle device');
             }
         } catch (err) {
-            console.error('Network error');
+            // DEBUG - console.error('❌ Network error:', err);
+            setError('Failed to toggle device');
         }
     };
-
+    
     /**
      * Toggles all light devices
      * @param {boolean} desiredState - Target state for all lights
-     */
+    */
     const toggleAllLights = async (desiredState) => {
+        // DEBUG - console.log(`🔄 Toggling all lights to ${desiredState ? 'ON' : 'OFF'}`);
+    
         try {
             const response = await fetch(`${DEVICES_API_URL}/toggle-all-lights`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ desiredState })
             });
-            
+    
             if (response.ok) {
                 const updatedLights = await response.json();
-                setDevices(prev => prev.map(device => 
-                    device.type === 'light' 
-                        ? updatedLights.find(light => light.id === device.id) || device
-                        : device
-                ));
-                
+                //DEBUG - console.log(`✅ Lights toggled successfully:`, updatedLights);
+    
+                // Update only light devices in state
+                setDevices(prevDevices =>
+                    prevDevices.map(device =>
+                        device.type === 'light'
+                            ? { ...device, isOn: updatedLights.find(light => light.id === device.id)?.isOn ?? device.isOn }
+                            : device
+                    )
+                );
+    
                 updatedLights.forEach(device => {
                     addActivity(device.name, desiredState ? 'turned on' : 'turned off');
                 });
+            } else {
+                const errorData = await response.json();
+                // DEBUG - console.error(`❌ Error toggling all lights: ${errorData.error}`);
+                setError(errorData.error || 'Failed to toggle all lights');
             }
         } catch (err) {
+            // DEBUG - console.error('❌ Network error:', err);
             setError('Failed to toggle all lights');
         }
     };
-
-     /**
+    
+    /**
      * Sets the temperature for a thermostat
      * @param {string} id - Device ID
      * @param {number} newTemp - New temperature value
-     */
+    */
     const setTemperature = async (id, newTemp) => {
         try {
             const response = await fetch(`${DEVICES_API_URL}/${id}/temperature`, {
@@ -93,10 +115,10 @@ export function useDevices() {
         }
     };
 
-      /**
+    /**
      * Adds a new device
      * @param {Object} deviceData - Device information including name, type, and roomId
-     */
+    */
 
       const addDevice = async (deviceData) => {
         try {
@@ -128,7 +150,7 @@ export function useDevices() {
     /**
      * Removes a device
      * @param {string} id - Device ID
-     */
+    */
     const removeDevice = async (id) => {
         try {
             const response = await fetch(`${DEVICES_API_URL}/${id}`, {

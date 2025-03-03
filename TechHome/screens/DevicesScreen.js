@@ -1,5 +1,5 @@
 // src/screens/DevicesScreen.js
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { DeviceCard } from '../components/devices/DeviceCard';
 import { deviceStyles } from '../styles/deviceStyles';
@@ -10,28 +10,38 @@ import { ErrorMessage } from '../components/ui/ErrorMessage';
 export default function DevicesScreen() {
   const { devices, rooms, error, isLoading, fetchDevices, toggleDevice, setTemperature, toggleAllLights } = useDevices();
 
+  useEffect(() => {
+    fetchDevices(); // Ensure devices update when screen loads
+  }, []);
+
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} retry={fetchDevices} />;
 
+  // Dynamically check the number of active devices
   const activeDevices = devices.filter(d => d.isOn).length;
   const lightDevices = devices.filter(d => d.type === 'light');
   const anyLightOn = lightDevices.some(d => d.isOn);
+
+  // Group devices by room
   const devicesByRoom = rooms.map(room => ({
     ...room,
-    devices: devices.filter(device => device.roomId === room.id)
+    devices: devices.filter(device => device.roomId === room.id),
   }));
 
+  // Toggle all lights ON/OFF based on their current state
   const handleToggleAllLights = () => {
+    // DEBUG - console.log(`🟢 Toggling all lights to ${anyLightOn ? "OFF" : "ON"}`);
     toggleAllLights(!anyLightOn);
   };
-  
-   return (
+
+  return (
     <ScrollView style={deviceStyles.container}>
       <View style={deviceStyles.header}>
         <Text style={deviceStyles.title}>My Devices</Text>
         <Text style={deviceStyles.subtitle}>
           {activeDevices} devices turned on
         </Text>
+        
         {lightDevices.length > 0 && (
           <TouchableOpacity 
             style={deviceStyles.toggleAllButton}
@@ -43,8 +53,7 @@ export default function DevicesScreen() {
           </TouchableOpacity>
         )}
       </View>
-      
-    
+
       {devicesByRoom.map(room => (
         <View key={room.id} style={deviceStyles.roomSection}>
           <Text style={deviceStyles.roomTitle}>{room.name}</Text>
