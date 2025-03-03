@@ -18,9 +18,17 @@ export function useHomeAssistantDevices() {
     }
   };
 
+  const toggleDevice = async (entityId) => {
+    try {
+      await axios.post(`http://localhost:5000/api/home-assistant/toggle/${entityId}`);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   useEffect(() => {
     fetchDevices();
   }, []);
 
-  return { haDevices, isLoading, error, fetchDevices };
+  return { haDevices, isLoading, error, fetchDevices, toggleDevice };
 }

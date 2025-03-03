@@ -20,19 +20,26 @@ export default function DeviceManagementScreen() {
   if (isLoading || haLoading) return <LoadingSpinner />;
   if (error || haError) return <ErrorMessage message={error || haError} />;
 
-  const handleAddDevice = () => {
+  const handleAddDevice = async () => {
     if (deviceName.trim() && selectedRoomId) {
-      addDevice({
+      const newDevice = {
         name: deviceName,
         type: deviceType,
-        roomId: selectedRoomId
-      });
+        roomId: selectedRoomId,
+        isHomeAssistant: !!selectedHaDevice,  // Ensure boolean
+        entityId: selectedHaDevice ? selectedHaDevice.entity_id : null,
+        attributes: selectedHaDevice ? selectedHaDevice.attributes : {}
+      };
+  
+      await addDevice(newDevice);
       setDeviceName('');
       setDeviceType('light');
       setSelectedRoomId('');
       setSelectedHaDevice(null);
     }
   };
+  
+  
 
   const handleSelectHaDevice = (device) => {
     setSelectedHaDevice(device);

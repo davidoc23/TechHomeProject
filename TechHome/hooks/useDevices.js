@@ -106,7 +106,10 @@ export function useDevices() {
                 body: JSON.stringify({
                     name: deviceData.name,
                     type: deviceData.type,
-                    roomId: deviceData.roomId  // Make sure this is included
+                    roomId: deviceData.roomId,  // Make sure this is included
+                    isHomeAssistant: deviceData.isHomeAssistant,
+                    entityId: deviceData.entityId || null,
+                    attributes: deviceData.attributes || {}
                 })
             });
             
