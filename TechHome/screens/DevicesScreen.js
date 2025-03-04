@@ -10,10 +10,6 @@ import { ErrorMessage } from '../components/ui/ErrorMessage';
 export default function DevicesScreen() {
   const { devices, rooms, error, isLoading, fetchDevices, toggleDevice, setTemperature, toggleAllLights } = useDevices();
 
-  useEffect(() => {
-    fetchDevices(); // Ensure devices update when screen loads
-  }, []);
-
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} retry={fetchDevices} />;
 
