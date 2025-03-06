@@ -1,6 +1,6 @@
 import { useDeviceContext } from '../context/DeviceContext';
 
-const API_URL = 'http://localhost:5000/api';
+//const API_URL = 'http://localhost:5000/api';
 const ROOMS_API_URL = 'http://localhost:5000/api/rooms';
 const AUTOMATIONS_API_URL = 'http://localhost:5000/api/automations';
 const DEVICES_API_URL = 'http://localhost:5000/api/devices';
