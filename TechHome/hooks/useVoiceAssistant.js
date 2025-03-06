@@ -10,4 +10,9 @@ import { useDevices } from './useDevices';
 export function useVoiceAssistant() {
     const { addActivity } = useDeviceContext();
     const { devices, toggleDevice, toggleAllLights, setTemperature, fetchDevices } = useDevices();
+
+    const [isListening, setIsListening] = useState(false);
+    const [lastCommand, setLastCommand] = useState('');
+    const [lastResponse, setLastResponse] = useState('');
+    const [error, setError] = useState(null);
 };
