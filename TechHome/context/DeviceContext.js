@@ -88,10 +88,10 @@ export function DeviceProvider({ children }) {
 
     useEffect(() => {
         // Set up polling interval to refresh devices
-        if (Date.now() - lastCommandTime < 30000) {
+        if (Date.now() - lastCommandTime < 20000) {
             const interval = setInterval(() => {
                 fetchDevices();
-            }, 3000);
+            }, 10000);
             
             return () => clearInterval(interval);
         }

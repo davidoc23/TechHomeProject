@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDevices } from '../hooks/useDevices';
 import { homeStyles } from '../styles/homeStyles'; 
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ErrorMessage } from '../components/ui/ErrorMessage';
+import { LeonVoiceAssistant } from '../components/ui/LeonVoiceAssistant';
 
 export default function HomeScreen() {
   const { devices, activities, error, isLoading, fetchDevices, toggleDevice, toggleAllLights } = useDevices();
+  // Add state for voice modal visibility
+  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
 
 
   if (isLoading) return <LoadingSpinner />;
@@ -29,6 +32,11 @@ export default function HomeScreen() {
     if (thermostat) {
       toggleDevice(thermostat.id);
     }
+  };
+
+  const handleVoiceControl = () => {
+    console.log("Voice control button pressed"); // For debugging
+    setVoiceModalVisible(true);
   };
 
   return (
@@ -87,10 +95,16 @@ export default function HomeScreen() {
     </View>
 
        {/* Voice Control */}
-       <TouchableOpacity style={homeStyles.voiceButton}>
+       <TouchableOpacity style={homeStyles.voiceButton} onPress={handleVoiceControl}>
         <Ionicons name="mic" size={24} color="white" />
         <Text style={homeStyles.voiceButtonText}>Voice Control</Text>
       </TouchableOpacity>
+
+      
+      <LeonVoiceAssistant 
+        visible={voiceModalVisible}
+        onClose={() => setVoiceModalVisible(false)}
+      />
 
     </ScrollView>
   );
