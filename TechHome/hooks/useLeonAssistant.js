@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useDeviceContext } from '../context/DeviceContext';
-
+import { LEON_API_KEY } from '../config';
 /**
  * Hook for connecting to the Leon voice assistant running at localhost:1337
  */
@@ -12,6 +12,7 @@ export function useLeonAssistant() {
     const [lastResponse, setLastResponse] = useState('');
     const [error, setError] = useState(null);
 
+    
     // Leon server configuration
     const LEON_SERVER = 'http://localhost:1338'; // Using the proxy
     const LEON_API = `${LEON_SERVER}/api/v1`;
