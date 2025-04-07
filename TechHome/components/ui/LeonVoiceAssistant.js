@@ -15,10 +15,11 @@ export const LeonVoiceAssistant = ({ visible, onClose }) => {
     lastCommand, 
     lastResponse, 
     error,
+    voiceEnabled,
     sendTextCommand, 
     startListening, 
     stopListening,
-    checkConnection 
+    checkConnection
   } = useLeonAssistant();
   
   const [commandInput, setCommandInput] = useState('');
@@ -98,7 +99,12 @@ export const LeonVoiceAssistant = ({ visible, onClose }) => {
                   <Ionicons name="mic" size={36} color={isListening ? "#fff" : "#007AFF"} />
                 </TouchableOpacity>
                 <Text style={voiceAssistantStyles.micText}>
-                  {isListening ? "Listening..." : "Tap to speak"}
+                  {isListening 
+                    ? "Listening..." 
+                    : voiceEnabled 
+                      ? "Tap to speak" 
+                      : "Voice input not available"
+                  }
                 </Text>
               </View>
 

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useDeviceContext } from '../context/DeviceContext';
 import { LEON_API_KEY } from '../config';
+import { Platform } from 'react-native';
+
 /**
  * Hook for connecting to the Leon voice assistant running at localhost:1337
  */
@@ -11,11 +13,66 @@ export function useLeonAssistant() {
     const [lastCommand, setLastCommand] = useState('');
     const [lastResponse, setLastResponse] = useState('');
     const [error, setError] = useState(null);
-
+    const [hasPermission, setHasPermission] = useState(true);
+    const [recognitionInstance, setRecognitionInstance] = useState(null);
+    
+    // Check if Web Speech API is available (web platforms only)
+    const speechRecognitionAvailable = Platform.OS === 'web' && 
+        ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
     
     // Leon server configuration
     const LEON_SERVER = 'http://localhost:1338'; // Using the proxy
     const LEON_API = `${LEON_SERVER}/api/v1`;
+
+    // Initialize speech recognition if available
+    useEffect(() => {
+        if (Platform.OS === 'web' && speechRecognitionAvailable) {
+            try {
+                // Create speech recognition instance
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const recognition = new SpeechRecognition();
+                
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+                
+                // Set up event handlers
+                recognition.onresult = (event) => {
+                    if (event.results && event.results.length > 0) {
+                        const transcript = event.results[0][0].transcript;
+                        setLastCommand(transcript);
+                        sendTextCommand(transcript);
+                    }
+                };
+                
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event);
+                    setError(`Voice recognition error: ${event.error}`);
+                    setIsListening(false);
+                };
+                
+                recognition.onend = () => {
+                    setIsListening(false);
+                };
+                
+                setRecognitionInstance(recognition);
+                setHasPermission(true);
+            } catch (err) {
+                console.error('Error initializing speech recognition:', err);
+                setError('Speech recognition not available');
+                setHasPermission(false);
+            }
+        } else {
+            // Not on web or speech recognition not available
+            if (Platform.OS === 'web') {
+                setError('Speech recognition not supported in this browser');
+                setHasPermission(false);
+            } else {
+                setError('Speech recognition not available on this platform');
+                setHasPermission(false);
+            }
+        }
+    }, []);
 
     /**
      * Connect to Leon server and check status
@@ -72,14 +129,15 @@ export function useLeonAssistant() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Key': LEON_API_KEY // Include the API key
+                    'X-API-Key': LEON_API_KEY
                 },
                 body: JSON.stringify({ utterance: text })
             });
 
             if (response.ok) {
                 const data = await response.json();
-                setLastResponse(data.message || 'Command processed');
+                const responseText = data.answer || data.message || 'Command processed';
+                setLastResponse(responseText);
                 
                 // Log the activity
                 if (data.answer) {
@@ -102,7 +160,7 @@ export function useLeonAssistant() {
     };
 
     /**
-     * Start Leon's voice recognition (simulation for UI)
+     * Start voice recognition if available, otherwise just update UI state
      */
     const startListening = async () => {
         if (!isConnected) {
@@ -113,14 +171,35 @@ export function useLeonAssistant() {
             }
         }
 
-        setIsListening(true);
-        setLastResponse('Listening... (Please speak your command)');
+        if (recognitionInstance && speechRecognitionAvailable) {
+            try {
+                recognitionInstance.start();
+                setIsListening(true);
+                setLastResponse('Listening... Speak your command');
+            } catch (err) {
+                console.error('Error starting speech recognition:', err);
+                setError(`Failed to start voice recognition: ${err.message}`);
+                setIsListening(false);
+            }
+        } else {
+            // Fallback for non-web platforms or if speech recognition isn't available
+            setIsListening(true);
+            setLastResponse('Listening... (Voice recognition not available. Please type your command)');
+        }
     };
 
     /**
-     * Stop Leon's voice recognition (simulation for UI)
+     * Stop voice recognition if running, otherwise just update UI state
      */
     const stopListening = async () => {
+        if (recognitionInstance && isListening && speechRecognitionAvailable) {
+            try {
+                recognitionInstance.stop();
+            } catch (err) {
+                console.error('Error stopping speech recognition:', err);
+            }
+        }
+        
         setIsListening(false);
         setLastResponse('Stopped listening');
     };
@@ -145,7 +224,8 @@ export function useLeonAssistant() {
         sendTextCommand,
         startListening,
         stopListening,
-        checkConnection
+        checkConnection,
+        hasPermission,
+        voiceEnabled: speechRecognitionAvailable && hasPermission
     };
 }
-
