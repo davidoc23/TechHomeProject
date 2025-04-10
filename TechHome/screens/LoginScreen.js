@@ -19,8 +19,9 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [isLogin, setIsLogin] = useState(true); // Toggle between login and register
+  const [email, setEmail] = useState('');
   
-  const { login, loading, error } = useAuth();
+  const { login, register, loading, error } = useAuth();
 
   const handleSubmit = async () => {
     try {
@@ -32,6 +33,14 @@ export default function LoginScreen({ navigation }) {
         }
         
         await login(username, password);
+      } else {
+        // Register functionality
+        if (!username || !password || !email) {
+          Alert.alert('Error', 'Please fill in all required fields');
+          return;
+        }
+        
+        await register(username, email, password);
       }
     } catch (error) {
       Alert.alert('Error', error.message);
@@ -43,6 +52,7 @@ export default function LoginScreen({ navigation }) {
     // Clear form fields
     setUsername('');
     setPassword('');
+    setEmail('');
   };
 
   if (loading) {
@@ -79,6 +89,20 @@ export default function LoginScreen({ navigation }) {
               autoCapitalize="none"
             />
           </View>
+
+          {!isLogin && (
+            <View style={LoginStyles.inputGroup}>
+              <Ionicons name="mail-outline" size={22} color="#777" style={LoginStyles.inputIcon} />
+              <TextInput
+                style={LoginStyles.input}
+                placeholder="Email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+          )}
 
           <View style={LoginStyles.inputGroup}>
             <Ionicons name="lock-closed-outline" size={22} color="#777" style={LoginStyles.inputIcon} />

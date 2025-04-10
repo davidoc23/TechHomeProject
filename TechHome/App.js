@@ -15,6 +15,7 @@ import RoomManagementScreen from './screens/RoomManagementScreen';
 import AutomationScreen from './screens/AutomationScreen';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
+
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
