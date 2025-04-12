@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Switch, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import SettingsStyles from '../styles/SettingsScreenStyle';
@@ -129,9 +129,17 @@ export default function SettingsScreen() {
       </View>
 
       <View style={SettingsStyles.section}>
+        {/* Direct logout button without Alert */}
         <TouchableOpacity 
           style={SettingsStyles.logoutButton} 
-          onPress={handleLogout}
+          onPress={() => {
+            console.log("Direct logout button pressed");
+            logout().then(() => {
+              console.log("Logout completed directly");
+            }).catch(err => {
+              console.error("Direct logout error:", err);
+            });
+          }}
           activeOpacity={0.7}
         >
           <Ionicons name="log-out-outline" size={24} color="#FF3B30" style={SettingsStyles.logoutIcon} />
@@ -145,3 +153,4 @@ export default function SettingsScreen() {
     </ScrollView>
   );
 }
+
