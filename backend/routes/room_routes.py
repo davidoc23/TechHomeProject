@@ -1,10 +1,12 @@
 from flask import Blueprint, jsonify, request
-from db import rooms_collection, devices_collection
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from db import rooms_collection, devices_collection, find_user_by_id
 from bson import ObjectId
 
 room_routes = Blueprint('rooms', __name__)
 
 @room_routes.route('/', methods=['GET'])
+@jwt_required()
 def get_rooms():
     try:
         rooms = list(rooms_collection.find())
@@ -17,6 +19,7 @@ def get_rooms():
     
 
 @room_routes.route('/', methods=['POST'])
+@jwt_required()
 def add_room():
     try:
         data = request.get_json()
@@ -38,6 +41,7 @@ def add_room():
     
 
 @room_routes.route('/<room_id>', methods=['PUT'])
+@jwt_required()
 def update_room(room_id):
     try:
         data = request.get_json()
@@ -59,6 +63,7 @@ def update_room(room_id):
         return jsonify({"error": str(e)}), 500
 
 @room_routes.route('/<room_id>', methods=['DELETE'])
+@jwt_required()
 def delete_room(room_id):
     try:
         # Check if room has devices
@@ -74,6 +79,7 @@ def delete_room(room_id):
         return jsonify({"error": str(e)}), 500
 
 @room_routes.route('/<room_id>/devices', methods=['GET'])
+@jwt_required()
 def get_room_devices(room_id):
     try:
         devices = list(devices_collection.find({"roomId": ObjectId(room_id)}))
