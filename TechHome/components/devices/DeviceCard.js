@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, Switch, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { deviceStyles } from '../../styles/deviceStyles';
@@ -6,26 +6,21 @@ import { useDeviceContext, DEVICE_EVENTS } from '../../context/DeviceContext';
 
 export const DeviceCard = ({ device, onToggle, onTemperatureChange }) => {
     const [isOn, setIsOn] = useState(device.isOn);
+    const [isToggling, setIsToggling] = useState(false);
     const { subscribeToDeviceEvents } = useDeviceContext();
 
-    // Update the toggle when `device.isOn` changes
+    // Update local state only if device prop changes and we're not in the middle of toggling
     useEffect(() => {
-        setIsOn(device.isOn);
-    }, [device.isOn]);
+        if (!isToggling) {
+            setIsOn(device.isOn);
+        }
+    }, [device.isOn, isToggling]);
 
     // Listen for device toggle events
     useEffect(() => {
         // Subscribe to device toggled events
         const unsubscribe = subscribeToDeviceEvents(DEVICE_EVENTS.DEVICE_TOGGLED, (updatedDevice) => {
-            if (updatedDevice.id === device.id) {
-                setIsOn(updatedDevice.isOn);
-            }
-        });
-        
-        // Also listen for all devices updates
-        const unsubscribeAll = subscribeToDeviceEvents(DEVICE_EVENTS.DEVICES_UPDATED, (devices) => {
-            const updatedDevice = devices.find(d => d.id === device.id);
-            if (updatedDevice) {
+            if (updatedDevice.id === device.id && !isToggling) {
                 setIsOn(updatedDevice.isOn);
             }
         });
@@ -33,19 +28,36 @@ export const DeviceCard = ({ device, onToggle, onTemperatureChange }) => {
         // Cleanup subscription when component unmounts
         return () => {
             unsubscribe();
-            unsubscribeAll();
         };
-    }, [device.id, subscribeToDeviceEvents]);
+    }, [device.id, subscribeToDeviceEvents, isToggling]);
 
-    const handleToggle = async () => {
+    const handleToggle = useCallback(async () => {
+        // Prevent toggling during an active toggle operation
+        if (isToggling) return;
+        
         try {
+            // Start toggling state
+            setIsToggling(true);
+            
+            // Immediately show toggle to make UI feel responsive
+            // This makes the UI responsive while we wait for real state
+            setIsOn(!isOn);
+            
             // Call the toggle function
             await onToggle(device.id);
-            // No need to manually update state here as the event listeners will catch changes
+            
+            // UI will correct itself if needed via device prop changes or event subscription
         } catch (error) {
             console.error("Error toggling device:", error);
+            // Revert to original state if there was an error
+            setIsOn(device.isOn);
+        } finally {
+            // Shorter delay before allowing another toggle
+            setTimeout(() => {
+                setIsToggling(false);
+            }, 300);
         }
-    };
+    }, [device.id, isToggling, onToggle, isOn, device.isOn]);
 
     return (
         <View style={deviceStyles.deviceCard}>
@@ -66,6 +78,7 @@ export const DeviceCard = ({ device, onToggle, onTemperatureChange }) => {
             </View>
             <Switch
                 value={isOn}
+                disabled={isToggling}
                 onValueChange={handleToggle}
                 trackColor={{ false: '#767577', true: '#81b0ff' }}
                 thumbColor={isOn ? '#007AFF' : '#f4f3f4'}

@@ -34,8 +34,6 @@ export function useDevices() {
      * @param {string} id - Device ID
     */
     const toggleDevice = async (id) => {
-        // DEBUG - console.log(`🔄 Toggling device: ${id}`);
-        
         // Signal that a toggle is about to happen
         setLastCommandTime(Date.now());
         
@@ -45,21 +43,27 @@ export function useDevices() {
             throw new Error('Device not found');
         }
         
-        // Temporarily update UI state for immediate feedback
-        const expectNewState = !device.isOn;
-        updateDevice(id, { isOn: expectNewState });
+        // For Home Assistant devices
+        const isHomeAssistant = device.isHomeAssistant;
+        const expectedNewState = !device.isOn;
         
         try {
+            // Make the API call with a faster timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+            
             const response = await fetch(`${DEVICES_API_URL}/${id}/toggle`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
     
             if (response.ok) {
-                const updatedDevice = await response.json();  // ✅ Ensure we receive a response
-                // DEBUG - console.log(`✅ Device toggled successfully: ${JSON.stringify(updatedDevice)}`);
-    
-                // Update state with the authoritative returned device state
+                const updatedDevice = await response.json();
+                
+                // Apply the update from the server immediately
                 updateDevice(id, { isOn: updatedDevice.isOn });
                 
                 // Broadcast the device toggle event to all components
@@ -67,37 +71,27 @@ export function useDevices() {
     
                 addActivity(updatedDevice.name, updatedDevice.isOn ? 'turned on' : 'turned off');
                 
-                // For Home Assistant devices, fetch all devices to ensure states are in sync
-                if (updatedDevice.isHomeAssistant) {
-                    // Request immediate device state refresh
-                    fetchDevices();
-                    
-                    // Also schedule a follow-up refresh to catch any delayed state changes
-                    setTimeout(() => fetchDevices(), 1000);
+                // For Home Assistant devices, minimize but ensure state consistency
+                if (isHomeAssistant) {
+                    // Quick refresh for state consistency
+                    setTimeout(() => fetchDevices(), 500);
                 }
                 
                 return updatedDevice;
             } else {
                 const errorData = await response.json();
-                // DEBUG - console.error(`❌ Error toggling device: ${errorData.error}`);
-                
-                // Revert the optimistic update since the operation failed
-                updateDevice(id, { isOn: device.isOn });
-                
                 setError(errorData.error || 'Failed to toggle device');
                 throw new Error(errorData.error || 'Failed to toggle device');
             }
         } catch (err) {
-            // DEBUG - console.error('❌ Network error:', err);
-            
-            // Revert the optimistic update since the operation failed
-            updateDevice(id, { isOn: device.isOn });
-            
-            setError('Failed to toggle device');
+            if (err.name === 'AbortError') {
+                console.error('Toggle request timed out');
+                setError('Request timed out');
+            } else {
+                console.error('Network error toggling device:', err);
+                setError('Failed to toggle device');
+            }
             throw err;
-        } finally {
-            // Make sure we trigger another state refresh in case Home Assistant state changed
-            setTimeout(() => fetchDevices(), 500);
         }
     };
     

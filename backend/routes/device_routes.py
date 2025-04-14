@@ -15,6 +15,10 @@ HOME_ASSISTANT_TOKEN = os.getenv("HOME_ASSISTANT_TOKEN")
 
 # Fetch the current state of a device from Home Assistant
 def get_homeassistant_state(entity_id):
+    """
+    Fetches and returns the current state of a Home Assistant entity.
+    Optimized for faster response.
+    """
     url = f"{HOME_ASSISTANT_URL}/api/states/{entity_id}"
     headers = {
         "Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}",
@@ -22,15 +26,19 @@ def get_homeassistant_state(entity_id):
     }
 
     try:
-        response = requests.get(url, headers=headers)
+        # Single request with short timeout
+        response = requests.get(url, headers=headers, timeout=1)
         if response.status_code == 200:
             ha_data = response.json()
             return ha_data.get("state") == "on"  # Returns True if "on", False otherwise
         else:
-            print(f"⚠️ Warning: Could not fetch state for {entity_id}. HTTP {response.status_code}: {response.text}")
+            print(f"⚠️ Warning: Could not fetch state for {entity_id}. HTTP {response.status_code}")
             return False
+    except requests.exceptions.Timeout:
+        print(f"⚠️ Timeout fetching state for {entity_id}")
+        return False
     except Exception as e:
-        # DEBUG - print(f"❌ Error fetching Home Assistant state: {str(e)}")
+        print(f"❌ Error fetching Home Assistant state: {str(e)}")
         return False
 
 @device_routes.route('/', methods=['GET'])
@@ -148,27 +156,34 @@ def toggle_device(device_id):
 
         if device.get('isHomeAssistant'):
             # Toggle Home Assistant Device
-            ha_payload = {"entity_id": device["entityId"]}
+            entity_id = device["entityId"]
+            print(f"🔄 Toggling Home Assistant entity: {entity_id} to {'ON' if new_state else 'OFF'}")
+            
+            # Get the desired service (on/off)
+            ha_service = "turn_on" if new_state else "turn_off"
+            ha_payload = {"entity_id": entity_id}
             ha_headers = {
                 "Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}",
                 "Content-Type": "application/json"
             }
-            ha_service = "turn_on" if new_state else "turn_off"
             ha_url = f"{HOME_ASSISTANT_URL}/api/services/light/{ha_service}"
-
-            ha_response = requests.post(ha_url, json=ha_payload, headers=ha_headers)
+            
+            # Send the command - with shorter timeout for faster response
+            print(f"📡 Sending {ha_service} command to Home Assistant for {entity_id}")
+            ha_response = requests.post(ha_url, json=ha_payload, headers=ha_headers, timeout=2)
 
             if ha_response.status_code == 401:
-                # DEBUG - print(f"❌ ERROR: Unauthorized Home Assistant token for {device['entityId']}")
+                print(f"❌ ERROR: Unauthorized Home Assistant token for {entity_id}")
                 return jsonify({"error": "Unauthorized - Invalid Home Assistant token"}), 401
 
             if ha_response.status_code != 200:
-                # DEBUG - print(f"⚠️ WARNING: Failed to toggle {device['entityId']}. Response: {ha_response.text}")
+                print(f"⚠️ WARNING: Failed to toggle {entity_id}. Response: {ha_response.text}")
                 return jsonify({"error": f"Failed to toggle Home Assistant device: {ha_response.text}"}), ha_response.status_code
-
-            # Fetch updated state from Home Assistant
-            new_state = get_homeassistant_state(device["entityId"])
-            # DEBUG - print(f"🔄 Updated state from Home Assistant: {new_state}")
+            
+            # Trust the state we requested - this avoids the race condition
+            # where the state check happens before Home Assistant processes the change
+            new_state = True if ha_service == "turn_on" else False
+            print(f"✅ Setting {entity_id} to {new_state} in database")
 
         else:
             # Handle Non-Home Assistant Devices (Local Devices)
