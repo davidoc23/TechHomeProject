@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -14,7 +15,6 @@ import DeviceManagementScreen from './screens/DeviceManagementScreen';
 import RoomManagementScreen from './screens/RoomManagementScreen';
 import AutomationScreen from './screens/AutomationScreen';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
-
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();

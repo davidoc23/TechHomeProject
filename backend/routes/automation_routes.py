@@ -1,10 +1,12 @@
 from flask import Blueprint, jsonify, request
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
-from db import automations_collection, devices_collection
+from db import automations_collection, devices_collection, find_user_by_id
 
 automation_routes = Blueprint('automations', __name__)
 
 @automation_routes.route('/', methods=['GET'])
+@jwt_required()
 def get_automations():
     try:
         automations = list(automations_collection.find())
@@ -19,6 +21,7 @@ def get_automations():
     
 
 @automation_routes.route('/', methods=['POST'])
+@jwt_required()
 def create_automation():
     try:
         data = request.get_json()
@@ -51,6 +54,7 @@ def create_automation():
     
 
 @automation_routes.route('/<automation_id>', methods=['PUT'])
+@jwt_required()
 def update_automation(automation_id):
     try:
         data = request.get_json()
@@ -77,6 +81,7 @@ def update_automation(automation_id):
     
 
 @automation_routes.route('/<automation_id>', methods=['DELETE'])
+@jwt_required()
 def delete_automation(automation_id):
     try:
         result = automations_collection.delete_one({"_id": ObjectId(automation_id)})
@@ -88,6 +93,7 @@ def delete_automation(automation_id):
     
 
 @automation_routes.route('/<automation_id>/toggle', methods=['POST'])
+@jwt_required()
 def toggle_automation(automation_id):
     try:
         automation = automations_collection.find_one({"_id": ObjectId(automation_id)})

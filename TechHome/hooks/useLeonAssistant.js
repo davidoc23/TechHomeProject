@@ -160,7 +160,7 @@ export function useLeonAssistant() {
     };
 
     /**
-     * Start voice recognition if available, otherwise just update UI state
+     * Start voice recognition (platform-specific implementation)
      */
     const startListening = async () => {
         if (!isConnected) {

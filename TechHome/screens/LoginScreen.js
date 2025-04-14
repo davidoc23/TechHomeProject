@@ -20,6 +20,8 @@ export default function LoginScreen({ navigation }) {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [isLogin, setIsLogin] = useState(true); // Toggle between login and register
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   
   const { login, register, loading, error } = useAuth();
 
@@ -40,7 +42,7 @@ export default function LoginScreen({ navigation }) {
           return;
         }
         
-        await register(username, email, password);
+        await register(username, email, password, firstName, lastName);
       }
     } catch (error) {
       Alert.alert('Error', error.message);
@@ -53,6 +55,8 @@ export default function LoginScreen({ navigation }) {
     setUsername('');
     setPassword('');
     setEmail('');
+    setFirstName('');
+    setLastName('');
   };
 
   if (loading) {
@@ -125,6 +129,30 @@ export default function LoginScreen({ navigation }) {
               />
             </TouchableOpacity>
           </View>
+
+          {!isLogin && (
+            <>
+              <View style={LoginStyles.inputGroup}>
+                <Ionicons name="person-outline" size={22} color="#777" style={LoginStyles.inputIcon} />
+                <TextInput
+                  style={LoginStyles.input}
+                  placeholder="First Name (Optional)"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                />
+              </View>
+
+              <View style={LoginStyles.inputGroup}>
+                <Ionicons name="person-outline" size={22} color="#777" style={LoginStyles.inputIcon} />
+                <TextInput
+                  style={LoginStyles.input}
+                  placeholder="Last Name (Optional)"
+                  value={lastName}
+                  onChangeText={setLastName}
+                />
+              </View>
+            </>
+          )}
 
           <TouchableOpacity style={LoginStyles.submitButton} onPress={handleSubmit}>
             <Text style={LoginStyles.submitButtonText}>

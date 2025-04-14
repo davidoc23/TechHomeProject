@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+import { API_URL } from '../config';
 
 //Create a context for device-related data and actions
 const DeviceContext = createContext();
@@ -21,10 +23,18 @@ export function DeviceProvider({ children }) {
     const [automations, setAutomations] = useState([]);
     const [lastCommandTime, setLastCommandTime] = useState(Date.now());  
 
+    // Get auth token for API requests
+    const { accessToken, isAuthenticated, refreshAuth } = useAuth() || {};
 
-
-     // API endpoints
-     const API_URL = 'http://localhost:5000/api';
+    /**
+     * Creates authorization headers for API requests
+     */
+    const getAuthHeaders = () => {
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': accessToken ? `Bearer ${accessToken}` : ''
+        };
+    };
 
 
      /**
@@ -33,17 +43,59 @@ export function DeviceProvider({ children }) {
      * If an error occurs, it sets an appropriate error message.
      */
     const fetchDevices = async () => {
+        // First, try to fetch with authentication
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch(`${API_URL}/devices`);
-            if (response.ok) {
-                const data = await response.json();//Parse the JSON response
-                setDevices(data);//Update the devices state
+            // For testing, use the debug endpoint that doesn't require authentication
+            // TEMPORARY SOLUTION UNTIL AUTH IS WORKING
+            const debugResponse = await fetch(`${API_URL}/debug/devices`);
+            
+            if (debugResponse.ok) {
+                const data = await debugResponse.json();
+                setDevices(data);
+                setIsLoading(false);
+                return;
+            }
+            
+            // If debug endpoint doesn't work, try the normal endpoint with auth
+            if (!isAuthenticated) {
+                setIsLoading(false);
+                return;
+            }
+            
+            const response = await fetch(`${API_URL}/devices`, {
+                headers: getAuthHeaders()
+            });
+            
+            if (response.status === 401) {
+                // Try to refresh the token
+                const refreshed = refreshAuth && await refreshAuth();
+                if (refreshed) {
+                    // Retry with new token
+                    const retryResponse = await fetch(`${API_URL}/devices`, {
+                        headers: getAuthHeaders()
+                    });
+                    if (retryResponse.ok) {
+                        const data = await retryResponse.json();
+                        setDevices(data);
+                    } else {
+                        setError('Authentication error');
+                    }
+                } else {
+                    console.log('Session expired or token refresh failed');
+                }
+            } else if (response.ok) {
+                const data = await response.json();
+                setDevices(data);
+            } else {
+                const errorData = await response.json();
+                setError(errorData.error || 'Failed to fetch devices');
             }
         } catch (err) {
+            console.error('Error fetching devices:', err);
             setError('Failed to fetch devices');
-        }  finally {
+        } finally {
             setIsLoading(false);
         }
     };
@@ -53,12 +105,45 @@ export function DeviceProvider({ children }) {
      */
     const fetchRooms = async () => {
         try {
-            const response = await fetch(`${API_URL}/rooms`);
-            if (response.ok) {
+            // For testing, use the debug endpoint that doesn't require authentication
+            // TEMPORARY SOLUTION UNTIL AUTH IS WORKING
+            const debugResponse = await fetch(`${API_URL}/debug/rooms`);
+            
+            if (debugResponse.ok) {
+                const data = await debugResponse.json();
+                setRooms(data);
+                return;
+            }
+            
+            // If debug endpoint doesn't work, try the normal endpoint with auth
+            if (!isAuthenticated) return;
+            
+            const response = await fetch(`${API_URL}/rooms`, {
+                headers: getAuthHeaders()
+            });
+            
+            if (response.status === 401) {
+                // Try to refresh the token
+                const refreshed = refreshAuth && await refreshAuth();
+                if (refreshed) {
+                    // Retry with new token
+                    const retryResponse = await fetch(`${API_URL}/rooms`, {
+                        headers: getAuthHeaders()
+                    });
+                    if (retryResponse.ok) {
+                        const data = await retryResponse.json();
+                        setRooms(data);
+                    }
+                }
+            } else if (response.ok) {
                 const data = await response.json();
                 setRooms(data);
+            } else {
+                const errorData = await response.json();
+                setError(errorData.error || 'Failed to fetch rooms');
             }
         } catch (err) {
+            console.error('Error fetching rooms:', err);
             setError('Failed to fetch rooms');
         }
     };
@@ -66,36 +151,70 @@ export function DeviceProvider({ children }) {
 
     const fetchAutomations = async () => {
         try {
-            const response = await fetch(`${API_URL}/automations`);
-            if (response.ok) {
+            // For testing, use the debug endpoint that doesn't require authentication
+            // TEMPORARY SOLUTION UNTIL AUTH IS WORKING
+            const debugResponse = await fetch(`${API_URL}/debug/automations`);
+            
+            if (debugResponse.ok) {
+                const data = await debugResponse.json();
+                setAutomations(data);
+                return;
+            }
+            
+            // If debug endpoint doesn't work, try the normal endpoint with auth
+            if (!isAuthenticated) return;
+            
+            const response = await fetch(`${API_URL}/automations`, {
+                headers: getAuthHeaders()
+            });
+            
+            if (response.status === 401) {
+                // Try to refresh the token
+                const refreshed = refreshAuth && await refreshAuth();
+                if (refreshed) {
+                    // Retry with new token
+                    const retryResponse = await fetch(`${API_URL}/automations`, {
+                        headers: getAuthHeaders()
+                    });
+                    if (retryResponse.ok) {
+                        const data = await retryResponse.json();
+                        setAutomations(data);
+                    }
+                }
+            } else if (response.ok) {
                 const data = await response.json();
                 setAutomations(data);
+            } else {
+                const errorData = await response.json();
+                setError(errorData.error || 'Failed to fetch automations');
             }
         } catch (err) {
+            console.error('Error fetching automations:', err);
             setError('Failed to fetch automations');
         }
     };
 
     /**
-     * useEffect to fetch the list of devices once on component mount.
-     * Dependencies: Empty array means this effect runs only once.
+     * useEffect to fetch the list of devices when mounted or auth state changes
      */
     useEffect(() => {
-        fetchRooms();
-        fetchDevices();
-        fetchAutomations();
-    }, []);
+        if (isAuthenticated) {
+            fetchRooms();
+            fetchDevices();
+            fetchAutomations();
+        }
+    }, [isAuthenticated, accessToken]);
 
     useEffect(() => {
         // Set up polling interval to refresh devices
-        if (Date.now() - lastCommandTime < 20000) {
+        if (isAuthenticated && Date.now() - lastCommandTime < 20000) {
             const interval = setInterval(() => {
                 fetchDevices();
             }, 10000);
             
             return () => clearInterval(interval);
         }
-    }, [lastCommandTime]);
+    }, [lastCommandTime, isAuthenticated]);
     /**
      * Adds a new activity to the activities log.
      * Activities represent user actions on devices, e.g., toggling a light.

@@ -19,7 +19,8 @@ export const LeonVoiceAssistant = ({ visible, onClose }) => {
     sendTextCommand, 
     startListening, 
     stopListening,
-    checkConnection
+    checkConnection,
+    hasPermission
   } = useLeonAssistant();
   
   const [commandInput, setCommandInput] = useState('');
@@ -47,6 +48,16 @@ export const LeonVoiceAssistant = ({ visible, onClose }) => {
       startListening();
     }
   };
+
+  const renderMicrophonePermissionError = () => (
+    <View style={voiceAssistantStyles.errorContainer}>
+      <Ionicons name="mic-off" size={40} color="#f44336" />
+      <Text style={voiceAssistantStyles.errorTitle}>Microphone Access Required</Text>
+      <Text style={voiceAssistantStyles.errorText}>
+        Please grant microphone permissions to use the voice assistant.
+      </Text>
+    </View>
+  );
 
   return (
     <Modal
@@ -86,6 +97,8 @@ export const LeonVoiceAssistant = ({ visible, onClose }) => {
                 <Text style={voiceAssistantStyles.retryButtonText}>Retry Connection</Text>
               </TouchableOpacity>
             </View>
+          ) : !hasPermission ? (
+            renderMicrophonePermissionError()
           ) : (
             <>
               <View style={voiceAssistantStyles.micContainer}>
