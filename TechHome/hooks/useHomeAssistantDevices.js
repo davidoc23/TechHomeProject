@@ -20,7 +20,10 @@ export function useHomeAssistantDevices() {
 
   const toggleDevice = async (entityId) => {
     try {
-      await axios.post(`http://localhost:5000/api/home-assistant/toggle/${entityId}`);
+      const response = await axios.post(`http://localhost:5000/api/home-assistant/toggle/${entityId}`);
+      // Refresh device states after toggling to ensure UI consistency
+      await fetchDevices();
+      return response.data;
     } catch (err) {
       setError(err.message);
     }

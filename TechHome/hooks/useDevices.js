@@ -1,4 +1,4 @@
-import { useDeviceContext } from '../context/DeviceContext';
+import { useDeviceContext, DEVICE_EVENTS } from '../context/DeviceContext';
 
 //const API_URL = 'http://localhost:5000/api';
 const ROOMS_API_URL = 'http://localhost:5000/api/rooms';
@@ -11,7 +11,23 @@ const DEVICES_API_URL = 'http://localhost:5000/api/devices';
  * Implements device-specific logic while using DeviceContext for state management
 */
 export function useDevices() {
-    const { devices, rooms,  automations, activities, error, fetchDevices, fetchAutomations, fetchRooms, addActivity, setDevices, setError  } = useDeviceContext();
+    const { 
+        devices, 
+        rooms, 
+        automations, 
+        activities, 
+        error, 
+        fetchDevices,
+        fetchAutomations, 
+        fetchRooms, 
+        addActivity, 
+        setDevices, 
+        setError, 
+        updateDevice,
+        subscribeToDeviceEvents,
+        emitDeviceEvent,
+        setLastCommandTime
+    } = useDeviceContext();
 
     /**
      * Toggles a device's state
@@ -19,7 +35,20 @@ export function useDevices() {
     */
     const toggleDevice = async (id) => {
         // DEBUG - console.log(`🔄 Toggling device: ${id}`);
-    
+        
+        // Signal that a toggle is about to happen
+        setLastCommandTime(Date.now());
+        
+        // Find the device first
+        const device = devices.find(d => d.id === id);
+        if (!device) {
+            throw new Error('Device not found');
+        }
+        
+        // Temporarily update UI state for immediate feedback
+        const expectNewState = !device.isOn;
+        updateDevice(id, { isOn: expectNewState });
+        
         try {
             const response = await fetch(`${DEVICES_API_URL}/${id}/toggle`, {
                 method: 'POST',
@@ -30,22 +59,45 @@ export function useDevices() {
                 const updatedDevice = await response.json();  // ✅ Ensure we receive a response
                 // DEBUG - console.log(`✅ Device toggled successfully: ${JSON.stringify(updatedDevice)}`);
     
-                // Update state properly
-                setDevices(prevDevices =>
-                    prevDevices.map(device =>
-                        device.id === id ? { ...device, isOn: updatedDevice.isOn } : device
-                    )
-                );
+                // Update state with the authoritative returned device state
+                updateDevice(id, { isOn: updatedDevice.isOn });
+                
+                // Broadcast the device toggle event to all components
+                emitDeviceEvent(DEVICE_EVENTS.DEVICE_TOGGLED, updatedDevice);
     
                 addActivity(updatedDevice.name, updatedDevice.isOn ? 'turned on' : 'turned off');
+                
+                // For Home Assistant devices, fetch all devices to ensure states are in sync
+                if (updatedDevice.isHomeAssistant) {
+                    // Request immediate device state refresh
+                    fetchDevices();
+                    
+                    // Also schedule a follow-up refresh to catch any delayed state changes
+                    setTimeout(() => fetchDevices(), 1000);
+                }
+                
+                return updatedDevice;
             } else {
                 const errorData = await response.json();
                 // DEBUG - console.error(`❌ Error toggling device: ${errorData.error}`);
+                
+                // Revert the optimistic update since the operation failed
+                updateDevice(id, { isOn: device.isOn });
+                
                 setError(errorData.error || 'Failed to toggle device');
+                throw new Error(errorData.error || 'Failed to toggle device');
             }
         } catch (err) {
             // DEBUG - console.error('❌ Network error:', err);
+            
+            // Revert the optimistic update since the operation failed
+            updateDevice(id, { isOn: device.isOn });
+            
             setError('Failed to toggle device');
+            throw err;
+        } finally {
+            // Make sure we trigger another state refresh in case Home Assistant state changed
+            setTimeout(() => fetchDevices(), 500);
         }
     };
     

@@ -1,24 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDevices } from '../hooks/useDevices';
 import { homeStyles } from '../styles/homeStyles'; 
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ErrorMessage } from '../components/ui/ErrorMessage';
+import { useDeviceContext, DEVICE_EVENTS } from '../context/DeviceContext';
 import { LeonVoiceAssistant } from '../components/ui/LeonVoiceAssistant';
 
 export default function HomeScreen() {
   const { devices, activities, error, isLoading, fetchDevices, toggleDevice, toggleAllLights } = useDevices();
+  const { subscribeToDeviceEvents } = useDeviceContext();
+  
   // Add state for voice modal visibility
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
+  // Track local state for active device count to ensure UI consistency
+  const [activeDeviceCount, setActiveDeviceCount] = useState(0);
+  const [totalDeviceCount, setTotalDeviceCount] = useState(0);
+  
+  // Keep device counts updated
+  useEffect(() => {
+    const active = devices.filter(d => d.isOn).length;
+    setActiveDeviceCount(active);
+    setTotalDeviceCount(devices.length);
+  }, [devices]);
+  
+  // Listen for device events to update counts immediately
+  useEffect(() => {
+    // When a device is toggled
+    const unsubscribeToggle = subscribeToDeviceEvents(DEVICE_EVENTS.DEVICE_TOGGLED, (updatedDevice) => {
+      setActiveDeviceCount(prev => updatedDevice.isOn ? prev + 1 : prev - 1);
+    });
+    
+    // When all devices are updated
+    const unsubscribeUpdate = subscribeToDeviceEvents(DEVICE_EVENTS.DEVICES_UPDATED, (allDevices) => {
+      const active = allDevices.filter(d => d.isOn).length;
+      setActiveDeviceCount(active);
+      setTotalDeviceCount(allDevices.length);
+    });
+    
+    return () => {
+      unsubscribeToggle();
+      unsubscribeUpdate();
+    };
+  }, [subscribeToDeviceEvents]);
 
 
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} retry={fetchDevices} />;
   
-  // Calculate quick stats
-  const activeDevices = devices.filter(d => d.isOn).length;
-  const totalDevices = devices.length;
+  // Use our tracked device counts instead of recalculating them each render
 
   const handleAllLights = () => {
     const lightDevices = devices.filter(device => device.type === 'light');
@@ -45,7 +76,7 @@ export default function HomeScreen() {
       <View style={homeStyles.welcomeSection}>
         <Text style={homeStyles.welcomeText}>Welcome Home</Text>
         <Text style={homeStyles.statsText}>
-          {activeDevices} of {totalDevices} devices active
+          {activeDeviceCount} of {totalDeviceCount} devices active
         </Text>
       </View>
 

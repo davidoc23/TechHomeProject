@@ -2,19 +2,49 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Switch, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { deviceStyles } from '../../styles/deviceStyles';
+import { useDeviceContext, DEVICE_EVENTS } from '../../context/DeviceContext';
 
 export const DeviceCard = ({ device, onToggle, onTemperatureChange }) => {
     const [isOn, setIsOn] = useState(device.isOn);
+    const { subscribeToDeviceEvents } = useDeviceContext();
 
     // Update the toggle when `device.isOn` changes
     useEffect(() => {
         setIsOn(device.isOn);
     }, [device.isOn]);
 
-    const handleToggle = () => {
-        // DEBUG - console.log(`🟢 Switch toggled for device: ${device.id} (current state: ${isOn})`);
-        setIsOn(prevState => !prevState); // Optimistically update UI
-        onToggle(device.id);
+    // Listen for device toggle events
+    useEffect(() => {
+        // Subscribe to device toggled events
+        const unsubscribe = subscribeToDeviceEvents(DEVICE_EVENTS.DEVICE_TOGGLED, (updatedDevice) => {
+            if (updatedDevice.id === device.id) {
+                setIsOn(updatedDevice.isOn);
+            }
+        });
+        
+        // Also listen for all devices updates
+        const unsubscribeAll = subscribeToDeviceEvents(DEVICE_EVENTS.DEVICES_UPDATED, (devices) => {
+            const updatedDevice = devices.find(d => d.id === device.id);
+            if (updatedDevice) {
+                setIsOn(updatedDevice.isOn);
+            }
+        });
+        
+        // Cleanup subscription when component unmounts
+        return () => {
+            unsubscribe();
+            unsubscribeAll();
+        };
+    }, [device.id, subscribeToDeviceEvents]);
+
+    const handleToggle = async () => {
+        try {
+            // Call the toggle function
+            await onToggle(device.id);
+            // No need to manually update state here as the event listeners will catch changes
+        } catch (error) {
+            console.error("Error toggling device:", error);
+        }
     };
 
     return (
