@@ -1,14 +1,44 @@
 // src/screens/DevicesScreen.js
 import React, { useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { DeviceCard } from '../components/devices/DeviceCard';
 import { deviceStyles } from '../styles/deviceStyles';
 import { useDevices } from '../hooks/useDevices';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ErrorMessage } from '../components/ui/ErrorMessage';
+import { useTheme } from '../context/ThemeContext';
 
 export default function DevicesScreen() {
   const { devices, rooms, error, isLoading, fetchDevices, toggleDevice, setTemperature, toggleAllLights } = useDevices();
+  const { theme, isDarkMode } = useTheme();
+  
+  // Import theme utilities
+  const { applyThemeToComponents } = require('../theme/utils');
+  
+  // Get common theme styles
+  const themeStyles = applyThemeToComponents(theme);
+  
+  // Screen-specific styles
+  const screenStyles = {
+    header: {
+      ...deviceStyles.header,
+      backgroundColor: theme.cardBackground,
+      ...theme.shadow,
+    },
+    roomSection: {
+      ...deviceStyles.roomSection,
+      backgroundColor: theme.cardBackground,
+      ...theme.shadow,
+    },
+    toggleAllButton: {
+      ...deviceStyles.toggleAllButton, 
+      backgroundColor: theme.primary + '20',
+    },
+    toggleAllText: {
+      ...deviceStyles.toggleAllText,
+      color: theme.primary,
+    }
+  };
 
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} retry={fetchDevices} />;
@@ -31,19 +61,20 @@ export default function DevicesScreen() {
   };
 
   return (
-    <ScrollView style={deviceStyles.container}>
-      <View style={deviceStyles.header}>
-        <Text style={deviceStyles.title}>My Devices</Text>
-        <Text style={deviceStyles.subtitle}>
+    <ScrollView style={themeStyles.screenContainer}>
+      <StatusBar barStyle={theme.statusBar} />
+      <View style={screenStyles.header}>
+        <Text style={[deviceStyles.title, themeStyles.text]}>My Devices</Text>
+        <Text style={[deviceStyles.subtitle, themeStyles.textSecondary]}>
           {activeDevices} devices turned on
         </Text>
         
         {lightDevices.length > 0 && (
           <TouchableOpacity 
-            style={deviceStyles.toggleAllButton}
+            style={screenStyles.toggleAllButton}
             onPress={handleToggleAllLights}
           >
-            <Text style={deviceStyles.toggleAllText}>
+            <Text style={screenStyles.toggleAllText}>
               {anyLightOn ? 'Turn Off All Lights' : 'Turn On All Lights'}
             </Text>
           </TouchableOpacity>
@@ -51,8 +82,8 @@ export default function DevicesScreen() {
       </View>
 
       {devicesByRoom.map(room => (
-        <View key={room.id} style={deviceStyles.roomSection}>
-          <Text style={deviceStyles.roomTitle}>{room.name}</Text>
+        <View key={room.id} style={screenStyles.roomSection}>
+          <Text style={[deviceStyles.roomTitle, themeStyles.text]}>{room.name}</Text>
           {room.devices.map(device => (
             <DeviceCard
               key={device.id}

@@ -109,9 +109,11 @@ const SettingsStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
-    backgroundColor: '#FFF0F0', // Light red background
+    backgroundColor: '#FFE5E5', // Light red background
     borderRadius: 5,
     margin: 10,
+    borderWidth: 1,
+    borderColor: '#FFCCCC',
   },
   logoutIcon: {
     marginRight: 10,
@@ -119,7 +121,8 @@ const SettingsStyles = StyleSheet.create({
   logoutText: {
     fontSize: 16,
     color: '#FF3B30',
-    fontWeight: '600',
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   versionContainer: {
     alignItems: 'center',

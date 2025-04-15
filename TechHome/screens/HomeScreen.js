@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useDevices } from '../hooks/useDevices';
 import { homeStyles } from '../styles/homeStyles'; 
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ErrorMessage } from '../components/ui/ErrorMessage';
 import { useDeviceContext, DEVICE_EVENTS } from '../context/DeviceContext';
+import { useTheme } from '../context/ThemeContext';
 import { LeonVoiceAssistant } from '../components/ui/LeonVoiceAssistant';
 
 export default function HomeScreen() {
   const { devices, activities, error, isLoading, fetchDevices, toggleDevice, toggleAllLights } = useDevices();
   const { subscribeToDeviceEvents } = useDeviceContext();
+  const { theme, isDarkMode } = useTheme();
   
   // Add state for voice modal visibility
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
@@ -70,35 +72,65 @@ export default function HomeScreen() {
     setVoiceModalVisible(true);
   };
 
+  // Import theme utilities
+  const { applyThemeToComponents } = require('../theme/utils');
+  
+  // Get common theme styles
+  const themeStyles = applyThemeToComponents(theme);
+  
+  // Screen-specific styles
+  const screenStyles = {
+    welcomeSection: {
+      ...homeStyles.welcomeSection,
+      backgroundColor: theme.cardBackground,
+      ...theme.shadow,
+    },
+    actionButton: {
+      ...homeStyles.actionButton,
+      backgroundColor: theme.cardBackground,
+      borderColor: theme.border,
+      borderWidth: 1,
+    },
+    voiceButton: {
+      ...homeStyles.voiceButton,
+      backgroundColor: theme.primary,
+    },
+    activityItem: {
+      ...homeStyles.activityItem, 
+      borderBottomColor: theme.border,
+    }
+  };
+
   return (
-    <ScrollView style={homeStyles.container}>
+    <ScrollView style={themeStyles.screenContainer}>
+      <StatusBar barStyle={theme.statusBar} />
       {/* Welcome Section */}
-      <View style={homeStyles.welcomeSection}>
-        <Text style={homeStyles.welcomeText}>Welcome Home</Text>
-        <Text style={homeStyles.statsText}>
+      <View style={screenStyles.welcomeSection}>
+        <Text style={[homeStyles.welcomeText, themeStyles.text]}>Welcome Home</Text>
+        <Text style={[homeStyles.statsText, themeStyles.textSecondary]}>
           {activeDeviceCount} of {totalDeviceCount} devices active
         </Text>
       </View>
 
       {/* Quick Actions */}
-      <View style={homeStyles.section}>
-        <Text style={homeStyles.sectionTitle}>Quick Actions</Text>
+      <View style={themeStyles.cardSection}>
+        <Text style={[homeStyles.sectionTitle, themeStyles.text]}>Quick Actions</Text>
         <View style={homeStyles.quickActions}>
 
           <TouchableOpacity 
-            style={homeStyles.actionButton}
+            style={screenStyles.actionButton}
             onPress={handleAllLights}
           >
-            <Ionicons name="bulb" size={24} color="#007AFF" />
-            <Text style={homeStyles.actionText}>All Lights</Text>
+            <Ionicons name="bulb" size={24} color={theme.primary} />
+            <Text style={themeStyles.text}>All Lights</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={homeStyles.actionButton}
+            style={screenStyles.actionButton}
             onPress={handleThermostat}
           >
-            <Ionicons name="thermometer" size={24} color="#007AFF" />
-            <Text style={homeStyles.actionText}>
+            <Ionicons name="thermometer" size={24} color={theme.primary} />
+            <Text style={themeStyles.text}>
               Thermostat ({devices.find(d => d.type === 'thermostat')?.temperature}°F)
             </Text>
           </TouchableOpacity>
@@ -107,26 +139,29 @@ export default function HomeScreen() {
       </View>
 
       {/* Recent Activity section */}
-    <View style={homeStyles.section}>
-        <Text style={homeStyles.sectionTitle}>Recent Activity</Text>
+    <View style={themeStyles.cardSection}>
+        <Text style={[homeStyles.sectionTitle, themeStyles.text]}>Recent Activity</Text>
         <View style={homeStyles.activityList}>
             {activities && activities.length > 0 ? (
                 activities.map((activity) => (
-                    <View key={activity.id} style={homeStyles.activityItem}>
-                        <Ionicons name="time-outline" size={20} color="#666" />
-                        <Text style={homeStyles.activityText}>
+                    <View key={activity.id} style={screenStyles.activityItem}>
+                        <Ionicons name="time-outline" size={20} color={theme.textSecondary} />
+                        <Text style={themeStyles.textSecondary}>
                             {activity.deviceName} {activity.action}
                         </Text>
                     </View>
                 ))
             ) : (
-                <Text style={homeStyles.activityText}>No recent activity</Text>
+                <Text style={themeStyles.textSecondary}>No recent activity</Text>
             )}
         </View>
     </View>
 
        {/* Voice Control */}
-       <TouchableOpacity style={homeStyles.voiceButton} onPress={handleVoiceControl}>
+       <TouchableOpacity 
+         style={screenStyles.voiceButton}
+         onPress={handleVoiceControl}
+       >
         <Ionicons name="mic" size={24} color="white" />
         <Text style={homeStyles.voiceButtonText}>Voice Control</Text>
       </TouchableOpacity>

@@ -1,15 +1,47 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal, StatusBar } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ErrorMessage } from '../components/ui/ErrorMessage';
 import { useDevices } from '../hooks/useDevices';
 import { useHomeAssistantDevices } from '../hooks/useHomeAssistantDevices';
+import { useTheme } from '../context/ThemeContext';
 import { deviceManagementStyles } from '../styles/deviceManagementStyles';
+import { applyThemeToComponents } from '../theme/utils';
 
 export default function DeviceManagementScreen() {
   const { devices, rooms, error, isLoading, addDevice, removeDevice } = useDevices();
   const { haDevices, isLoading: haLoading, error: haError, fetchDevices: fetchHaDevices } = useHomeAssistantDevices();
+  const { theme, isDarkMode } = useTheme();
+  
+  // Get theme styles
+  const themeStyles = applyThemeToComponents(theme);
+  
+  // Screen-specific styles
+  const screenStyles = {
+    deviceItem: {
+      ...deviceManagementStyles.deviceItem,
+      borderColor: theme.border,
+    },
+    deviceInfo: {
+      ...deviceManagementStyles.deviceInfo,
+    },
+    deviceDetails: {
+      ...deviceManagementStyles.deviceDetails,
+      color: theme.textSecondary,
+    },
+    removeButton: {
+      ...deviceManagementStyles.removeButton,
+      backgroundColor: theme.danger + '20',
+    },
+    removeButtonText: {
+      color: theme.danger,
+    },
+    modalContent: {
+      ...deviceManagementStyles.modalContent,
+      backgroundColor: theme.cardBackground,
+    },
+  };
   const [deviceName, setDeviceName] = useState('');
   const [deviceType, setDeviceType] = useState('light');
   const [selectedRoomId, setSelectedRoomId] = useState('');
@@ -63,99 +95,109 @@ export default function DeviceManagementScreen() {
   };
 
   return (
-    <ScrollView style={deviceManagementStyles.container}>
-      <View style={deviceManagementStyles.section}>
-        <Text style={deviceManagementStyles.title}>Add New Device</Text>
+    <ScrollView style={themeStyles.screenContainer}>
+      <StatusBar barStyle={theme.statusBar} />
+      <View style={themeStyles.cardSection}>
+        <Text style={[deviceManagementStyles.title, themeStyles.text]}>Add New Device</Text>
         
         <TextInput
-          style={deviceManagementStyles.input}
+          style={themeStyles.input}
           value={deviceName}
           onChangeText={setDeviceName}
           placeholder="Device Name"
-          placeholderTextColor="#566"
+          placeholderTextColor={theme.textTertiary}
         />
 
-        <Picker
-          selectedValue={deviceType}
-          onValueChange={setDeviceType}
-          style={deviceManagementStyles.picker}>
-          <Picker.Item label="Light" value="light" />
-          <Picker.Item label="Thermostat" value="thermostat" />
-        </Picker>
+        <View style={themeStyles.pickerContainer}>
+          <Picker
+            selectedValue={deviceType}
+            onValueChange={setDeviceType}
+            dropdownIconColor={theme.text}
+            style={{ color: theme.text }}
+            itemStyle={{ color: theme.isDark ? 'white' : theme.text }}>
+            <Picker.Item label="Light" value="light" color={theme.isDark ? 'white' : theme.text} />
+            <Picker.Item label="Thermostat" value="thermostat" color={theme.isDark ? 'white' : theme.text} />
+          </Picker>
+        </View>
 
-        <Picker
-          selectedValue={selectedRoomId}
-          onValueChange={setSelectedRoomId}
-          style={deviceManagementStyles.picker}>
-          <Picker.Item label="Select a room" value="" />
-          {rooms.map(room => (
-            <Picker.Item 
-              key={room.id} 
-              label={room.name} 
-              value={room.id} 
-            />
-          ))}
-        </Picker>
+        <View style={[deviceManagementStyles.picker, { borderColor: theme.border, backgroundColor: theme.isDarkMode ? theme.cardBackground : theme.background }]}>
+          <Picker
+            selectedValue={selectedRoomId}
+            onValueChange={setSelectedRoomId}
+            dropdownIconColor={theme.text}
+            style={{ color: theme.text }}
+            itemStyle={{ color: theme.text, backgroundColor: theme.isDarkMode ? '#000000' : theme.cardBackground }}>
+            <Picker.Item label="Select a room" value="" color={theme.isDarkMode ? 'white' : theme.text} />
+            {rooms.map(room => (
+              <Picker.Item 
+                key={room.id} 
+                label={room.name} 
+                value={room.id}
+                color={theme.isDarkMode ? 'white' : theme.text}
+              />
+            ))}
+          </Picker>
+        </View>
 
         <TouchableOpacity 
           style={[
-            deviceManagementStyles.addButton,
-            (!deviceName.trim() || !selectedRoomId) && deviceManagementStyles.addButtonDisabled
+            themeStyles.primaryButton,
+            (!deviceName.trim() || !selectedRoomId) && { opacity: 0.5 }
           ]}
           onPress={handleAddDevice}
           disabled={!deviceName.trim() || !selectedRoomId}>
-          <Text style={deviceManagementStyles.buttonText}>Add Device</Text>
+          <Text style={themeStyles.buttonText}>Add Device</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={deviceManagementStyles.section}>
-        <Text style={deviceManagementStyles.title}>Current Devices</Text>
+      <View style={themeStyles.cardSection}>
+        <Text style={[deviceManagementStyles.title, themeStyles.text]}>Current Devices</Text>
         {devices.map(device => (
-          <View key={device.id} style={deviceManagementStyles.deviceItem}>
-            <View style={deviceManagementStyles.deviceInfo}>
-              <Text style={deviceManagementStyles.deviceName}>{device.name}</Text>
-              <Text style={deviceManagementStyles.deviceDetails}>
+          <View key={device.id} style={[themeStyles.listItem, { borderRadius: 8, marginBottom: 10 }]}>
+            <View style={screenStyles.deviceInfo}>
+              <Text style={themeStyles.text}>{device.name}</Text>
+              <Text style={themeStyles.textSecondary}>
                 {device.type} • {rooms.find(r => r.id === device.roomId)?.name || 'No Room'}
               </Text>
             </View>
             <TouchableOpacity 
-              style={deviceManagementStyles.removeButton}
+              style={screenStyles.removeButton}
               onPress={() => removeDevice(device.id)}>
-              <Text style={deviceManagementStyles.removeButtonText}>Remove</Text>
+              <Text style={screenStyles.removeButtonText}>Remove</Text>
             </TouchableOpacity>
           </View>
         ))}
       </View>
 
-      <View style={deviceManagementStyles.section}>
+      <View style={themeStyles.cardSection}>
         <TouchableOpacity 
-          style={deviceManagementStyles.addButton}
+          style={themeStyles.primaryButton}
           onPress={handleShowHaDevices}>
-          <Text style={deviceManagementStyles.buttonText}>
+          <Text style={themeStyles.buttonText}>
             {showHaDevices ? 'Hide Home Assistant Devices' : 'Show Home Assistant Devices'}
           </Text>
         </TouchableOpacity>
         {showHaDevices && (
-          <View>
+          <View style={{ marginTop: 15 }}>
             <TextInput
-              style={deviceManagementStyles.input}
+              style={themeStyles.input}
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search Devices"
-              placeholderTextColor="#566"
+              placeholderTextColor={theme.textTertiary}
             />
             {filteredDevices.map(device => (
-              <View key={device.entity_id} style={deviceManagementStyles.deviceItem}>
-                <View style={deviceManagementStyles.deviceInfo}>
-                  <Text style={deviceManagementStyles.deviceName}>{device.attributes.friendly_name}</Text>
-                  <Text style={deviceManagementStyles.deviceDetails}>
+              <View key={device.entity_id} style={[themeStyles.listItem, { borderRadius: 8, marginBottom: 10 }]}>
+                <View style={screenStyles.deviceInfo}>
+                  <Text style={themeStyles.text}>{device.attributes.friendly_name}</Text>
+                  <Text style={themeStyles.textSecondary}>
                     {device.entity_id} • {device.state}
                   </Text>
                 </View>
                 <TouchableOpacity 
-                  style={deviceManagementStyles.addButton}
+                  style={themeStyles.primaryButton}
                   onPress={() => handleSelectHaDevice(device)}>
-                  <Text style={deviceManagementStyles.buttonText}>Add to My Devices</Text>
+                  <Text style={themeStyles.buttonText}>Add</Text>
                 </TouchableOpacity>
               </View>
             ))}

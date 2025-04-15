@@ -1,14 +1,73 @@
 // screens/AutomationScreen.js
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StatusBar } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ErrorMessage } from '../components/ui/ErrorMessage';
 import { useDevices } from '../hooks/useDevices';
+import { useTheme } from '../context/ThemeContext';
 import { automationStyles } from '../styles/automationStyles';
+import { applyThemeToComponents } from '../theme/utils';
 
 export default function AutomationScreen() {
   const { devices, rooms, automations, error, isLoading, addAutomation, removeAutomation, toggleAutomation } = useDevices();
+  const { theme, isDarkMode } = useTheme();
+  
+  // Get shared component styles from theme
+  const themeStyles = applyThemeToComponents(theme);
+  
+  // Create screen-specific dynamic styles
+  const dynamicStyles = {
+    ...themeStyles,
+    automationItem: {
+      ...automationStyles.automationItem,
+      borderColor: theme.border,
+    },
+    toggleButton: {
+      ...automationStyles.toggleButton,
+      backgroundColor: theme.primary + '20',
+    },
+    toggleButtonText: {
+      color: theme.primary
+    },
+    activeToggleButton: {
+      backgroundColor: theme.success + '20',
+    },
+    activeToggleText: {
+      color: theme.success
+    },
+    removeButton: {
+      ...automationStyles.removeButton,
+      backgroundColor: theme.danger + '20',
+    },
+    removeButtonText: {
+      color: theme.danger
+    },
+    automationItem: {
+      ...automationStyles.automationItem,
+      borderColor: theme.border,
+    },
+    toggleButton: {
+      ...automationStyles.toggleButton,
+      backgroundColor: theme.primary + '20',
+    },
+    toggleButtonText: {
+      color: theme.primary
+    },
+    activeToggleButton: {
+      backgroundColor: theme.success + '20',
+    },
+    activeToggleText: {
+      color: theme.success
+    },
+    removeButton: {
+      ...automationStyles.removeButton,
+      backgroundColor: theme.danger + '20',
+    },
+    removeButtonText: {
+      color: theme.danger
+    }
+  };
   const [automationName, setAutomationName] = useState('');
   const [automationType, setAutomationType] = useState('time');
   const [selectedDevice, setSelectedDevice] = useState('');
@@ -40,95 +99,112 @@ export default function AutomationScreen() {
   };
 
   return (
-    <ScrollView style={automationStyles.container}>
-      <View style={automationStyles.section}>
-        <Text style={automationStyles.title}>Add New Automation</Text>
+    <ScrollView style={themeStyles.screenContainer}>
+      <StatusBar barStyle={theme.statusBar} />
+      <View style={themeStyles.cardSection}>
+        <Text style={[automationStyles.title, themeStyles.text]}>Add New Automation</Text>
         
         <TextInput
-          style={automationStyles.input}
+          style={themeStyles.input}
           value={automationName}
           onChangeText={setAutomationName}
+          placeholderTextColor={theme.textTertiary}
           placeholder="Automation Name"
-          placeholderTextColor="#666"
         />
 
-        <Picker
-          selectedValue={automationType}
-          onValueChange={setAutomationType}
-          style={automationStyles.picker}>
-          <Picker.Item label="Time-based" value="time" />
-          <Picker.Item label="Device-linked" value="device-link" />
-        </Picker>
+        <View style={themeStyles.pickerContainer}>
+          <Picker
+            selectedValue={automationType}
+            onValueChange={setAutomationType}
+            dropdownIconColor={theme.text}
+            style={{ color: theme.text }}
+            itemStyle={{ color: theme.isDark ? 'white' : theme.text }}>
+            <Picker.Item label="Time-based" value="time" color={theme.isDark ? 'white' : theme.text} />
+            <Picker.Item label="Device-linked" value="device-link" color={theme.isDark ? 'white' : theme.text} />
+          </Picker>
+        </View>
 
 
         {automationType === 'time' && (
           <TextInput
-            style={automationStyles.input}
+            style={themeStyles.input}
             value={timeCondition}
             onChangeText={setTimeCondition}
             placeholder="Time (HH:MM)"
-            placeholderTextColor="#666"
+            placeholderTextColor={theme.textTertiary}
+            keyboardType="numbers-and-punctuation"
           />
         )}
 
-        <Picker
-          selectedValue={selectedDevice}
-          onValueChange={setSelectedDevice}
-          style={automationStyles.picker}>
-          <Picker.Item label="Select Device" value="" />
-          {devices.map(device => (
-            <Picker.Item 
-              key={device.id} 
-              label={`${device.name} (${rooms.find(r => r.id === device.roomId)?.name})`}
-              value={device.id} 
-            />
-          ))}
-        </Picker>
+        <View style={themeStyles.pickerContainer}>
+          <Picker
+            selectedValue={selectedDevice}
+            onValueChange={setSelectedDevice}
+            dropdownIconColor={theme.text}
+            style={{ color: theme.text }}
+            itemStyle={{ color: theme.isDark ? 'white' : theme.text }}>
+            <Picker.Item label="Select Device" value="" color={theme.isDark ? 'white' : theme.text} />
+            {devices.map(device => (
+              <Picker.Item 
+                key={device.id} 
+                label={`${device.name} (${rooms.find(r => r.id === device.roomId)?.name})`}
+                value={device.id}
+                color={theme.isDark ? 'white' : theme.text}
+              />
+            ))}
+          </Picker>
+        </View>
 
-        <Picker
-          selectedValue={selectedAction}
-          onValueChange={setSelectedAction}
-          style={automationStyles.picker}>
-          <Picker.Item label="Toggle" value="toggle" />
-          <Picker.Item label="Turn On" value="turn_on" />
-          <Picker.Item label="Turn Off" value="turn_off" />
-          {selectedDevice && devices.find(d => d.id === selectedDevice)?.type === 'thermostat' && (
-            <Picker.Item label="Set Temperature" value="set_temperature" />
-          )}
-        </Picker>
+        <View style={themeStyles.pickerContainer}>
+          <Picker
+            selectedValue={selectedAction}
+            onValueChange={setSelectedAction}
+            dropdownIconColor={theme.text}
+            style={{ color: theme.text }}
+            itemStyle={{ color: theme.isDark ? 'white' : theme.text }}>
+            <Picker.Item label="Toggle" value="toggle" color={theme.isDark ? 'white' : theme.text} />
+            <Picker.Item label="Turn On" value="turn_on" color={theme.isDark ? 'white' : theme.text} />
+            <Picker.Item label="Turn Off" value="turn_off" color={theme.isDark ? 'white' : theme.text} />
+            {selectedDevice && devices.find(d => d.id === selectedDevice)?.type === 'thermostat' && (
+              <Picker.Item label="Set Temperature" value="set_temperature" color={theme.isDark ? 'white' : theme.text} />
+            )}
+          </Picker>
+        </View>
 
         <TouchableOpacity 
-          style={automationStyles.addButton}
+          style={themeStyles.primaryButton}
           onPress={handleAddAutomation}>
-          <Text style={automationStyles.buttonText}>Add Automation</Text>
+          <Text style={themeStyles.buttonText}>Add Automation</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={automationStyles.section}>
-        <Text style={automationStyles.title}>Current Automations</Text>
+      <View style={[themeStyles.cardSection, { marginTop: 10 }]}>
+        <Text style={[automationStyles.title, themeStyles.text]}>Current Automations</Text>
         {automations?.map(automation => (
-          <View key={automation.id} style={automationStyles.automationItem}>
+          <View key={automation.id} style={[themeStyles.listItem, { borderRadius: 8, marginBottom: 10 }]}>
             <View style={automationStyles.automationInfo}>
-              <Text style={automationStyles.automationName}>{automation.name}</Text>
-              <Text style={automationStyles.automationType}>
+              <Text style={[automationStyles.automationName, themeStyles.text]}>{automation.name}</Text>
+              <Text style={[automationStyles.automationType, themeStyles.textSecondary]}>
                 {automation.type === 'time' ? 'Time-based' : 'Device-linked'}
               </Text>
             </View>
             <View style={automationStyles.automationActions}>
               <TouchableOpacity 
                 style={[
-                  automationStyles.toggleButton,
-                  automation.enabled && automationStyles.toggleButtonEnabled
+                  dynamicStyles.toggleButton,
+                  automation.enabled && dynamicStyles.activeToggleButton
                 ]}
                 onPress={() => toggleAutomation(automation.id)}>
-                <Text style={automationStyles.toggleButtonText}>
+                <Text style={[
+                  automation.enabled ? dynamicStyles.activeToggleText : dynamicStyles.toggleButtonText
+                ]}>
                   {automation.enabled ? 'Enabled' : 'Disabled'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={automationStyles.removeButton}
+                style={dynamicStyles.removeButton}
                 onPress={() => removeAutomation(automation.id)}>
-                <Text style={automationStyles.removeButtonText}>Remove</Text>
+                <Text style={dynamicStyles.removeButtonText}>Remove</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -4,11 +4,12 @@ import { StyleSheet } from 'react-native';
 export const automationStyles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
-    backgroundColor: '#fff'
+    padding: 15
   },
   section: {
-    marginBottom: 20
+    marginBottom: 20,
+    padding: 15,
+    borderRadius: 8
   },
   title: {
     fontSize: 20,
@@ -17,7 +18,6 @@ export const automationStyles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     padding: 10,
     marginBottom: 15,
@@ -25,18 +25,21 @@ export const automationStyles = StyleSheet.create({
   },
   picker: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
-    marginBottom: 15
+    marginBottom: 15,
+    color: 'inherit' // This helps with web compatibility
+  },
+  darkPicker: {
+    // Additional styles specific to dark mode
+    color: 'white',
+    backgroundColor: '#121212'
   },
   addButton: {
-    backgroundColor: '#007AFF',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center'
   },
   buttonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600'
   },
@@ -46,7 +49,6 @@ export const automationStyles = StyleSheet.create({
     alignItems: 'center',
     padding: 15,
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     marginBottom: 10
   },
@@ -59,7 +61,6 @@ export const automationStyles = StyleSheet.create({
   },
   automationType: {
     fontSize: 14,
-    color: '#666',
     marginTop: 4
   },
   automationActions: {
@@ -67,25 +68,18 @@ export const automationStyles = StyleSheet.create({
     alignItems: 'center'
   },
   toggleButton: {
-    backgroundColor: '#666',
     padding: 8,
     borderRadius: 6,
     marginRight: 8
   },
-  toggleButtonEnabled: {
-    backgroundColor: '#4CD964'
-  },
   toggleButtonText: {
-    color: 'white',
     fontSize: 14
   },
   removeButton: {
-    backgroundColor: '#FF3B30',
     padding: 8,
     borderRadius: 6
   },
   removeButtonText: {
-    color: 'white',
     fontSize: 14
   }
 });

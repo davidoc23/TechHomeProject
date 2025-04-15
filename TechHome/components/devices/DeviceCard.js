@@ -3,11 +3,13 @@ import { View, Text, Switch, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { deviceStyles } from '../../styles/deviceStyles';
 import { useDeviceContext, DEVICE_EVENTS } from '../../context/DeviceContext';
+import { useTheme } from '../../context/ThemeContext';
 
 export const DeviceCard = ({ device, onToggle, onTemperatureChange }) => {
     const [isOn, setIsOn] = useState(device.isOn);
     const [isToggling, setIsToggling] = useState(false);
     const { subscribeToDeviceEvents } = useDeviceContext();
+    const { theme } = useTheme();
 
     // Update local state only if device prop changes and we're not in the middle of toggling
     useEffect(() => {
@@ -60,16 +62,16 @@ export const DeviceCard = ({ device, onToggle, onTemperatureChange }) => {
     }, [device.id, isToggling, onToggle, isOn, device.isOn]);
 
     return (
-        <View style={deviceStyles.deviceCard}>
+        <View style={[deviceStyles.deviceCard, { backgroundColor: theme.cardBackground }]}>
             <View style={deviceStyles.deviceInfo}>
                 <Ionicons 
                     name={device.type === 'light' ? 'bulb' : 'thermometer'} 
                     size={24} 
-                    color={isOn ? '#007AFF' : '#666'}
+                    color={isOn ? theme.primary : theme.textTertiary}
                 />
                 <View style={deviceStyles.deviceDetails}>
-                    <Text style={deviceStyles.deviceName}>{device.name}</Text>
-                    <Text style={deviceStyles.deviceStatus}>
+                    <Text style={[deviceStyles.deviceName, { color: theme.text }]}>{device.name}</Text>
+                    <Text style={[deviceStyles.deviceStatus, { color: theme.textSecondary }]}>
                         {device.type === 'thermostat' 
                             ? `Temperature: ${device.temperature ?? '--'}°F`
                             : isOn ? 'On' : 'Off'}
@@ -80,8 +82,8 @@ export const DeviceCard = ({ device, onToggle, onTemperatureChange }) => {
                 value={isOn}
                 disabled={isToggling}
                 onValueChange={handleToggle}
-                trackColor={{ false: '#767577', true: '#81b0ff' }}
-                thumbColor={isOn ? '#007AFF' : '#f4f3f4'}
+                trackColor={{ false: theme.border, true: theme.primary + '80' }}
+                thumbColor={isOn ? theme.primary : theme.border}
             />
         </View>
     );

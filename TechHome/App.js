@@ -4,13 +4,14 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text } from 'react-native';
+import { View, Text, StatusBar } from 'react-native';
 import DevicesScreen from './screens/DevicesScreen';
 import HomeScreen from './screens/HomeScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import LoginScreen from './screens/LoginScreen';
 import { DeviceProvider } from './context/DeviceContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme, darkTheme } from './context/ThemeContext';
 import DeviceManagementScreen from './screens/DeviceManagementScreen';
 import RoomManagementScreen from './screens/RoomManagementScreen';
 import AutomationScreen from './screens/AutomationScreen';
@@ -21,6 +22,8 @@ const Stack = createNativeStackNavigator();
 
 // Main tab navigator for authenticated users
 function MainTabNavigator() {
+  const { theme, isDarkMode } = useTheme();
+  
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -43,8 +46,21 @@ function MainTabNavigator() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.textTertiary,
+        tabBarStyle: {
+          backgroundColor: theme.cardBackground,
+          borderTopColor: theme.border,
+        },
+        headerStyle: {
+          backgroundColor: theme.cardBackground,
+          borderBottomColor: theme.border,
+          shadowColor: theme.shadow.shadowColor,
+        },
+        headerTintColor: theme.text,
+        headerTitleStyle: {
+          color: theme.text,
+        },
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
@@ -69,6 +85,7 @@ function AuthNavigator() {
 // Root navigator that decides which flow to show based on auth state
 function RootNavigator() {
   const { isAuthenticated, loading, user, accessToken } = useAuth();
+  const { theme, darkTheme } = useTheme();
   
   // Log authentication state changes
   React.useEffect(() => {
@@ -84,11 +101,36 @@ function RootNavigator() {
   }, [isAuthenticated, user, accessToken, loading]);
 
   if (loading) {
-    return <LoadingSpinner />;
+    return (
+      <>
+        <StatusBar barStyle={theme.statusBar} />
+        <LoadingSpinner />
+      </>
+    );
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer
+      theme={{
+        dark: theme === darkTheme,
+        colors: {
+          primary: theme.primary,
+          background: theme.background,
+          card: theme.cardBackground,
+          text: theme.text,
+          border: theme.border,
+          notification: theme.primary,
+        },
+        fonts: {
+          regular: { fontFamily: 'System', fontWeight: '400' },
+          medium: { fontFamily: 'System', fontWeight: '500' },
+          light: { fontFamily: 'System', fontWeight: '300' },
+          thin: { fontFamily: 'System', fontWeight: '100' },
+          bold: { fontFamily: 'System', fontWeight: '700' },
+        }
+      }}
+    >
+      <StatusBar barStyle={theme.statusBar} />
       {isAuthenticated ? <MainTabNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
@@ -97,9 +139,11 @@ function RootNavigator() {
 function App() {
   return (
     <AuthProvider>
-      <DeviceProvider>
-        <RootNavigator />
-      </DeviceProvider>
+      <ThemeProvider>
+        <DeviceProvider>
+          <RootNavigator />
+        </DeviceProvider>
+      </ThemeProvider>
     </AuthProvider>
   );
 }

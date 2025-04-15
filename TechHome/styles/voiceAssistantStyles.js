@@ -9,7 +9,6 @@ export const voiceAssistantStyles = StyleSheet.create({
   },
   modalContent: {
     width: '90%',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
     maxHeight: '80%'
@@ -22,8 +21,7 @@ export const voiceAssistantStyles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333'
+    fontWeight: 'bold'
   },
   closeButton: {
     padding: 5
@@ -36,22 +34,18 @@ export const voiceAssistantStyles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#007AFF'
+    borderWidth: 1
   },
   micButtonActive: {
-    backgroundColor: '#007AFF'
+    // backgroundColor handled in component
   },
   micText: {
-    fontSize: 16,
-    color: '#666'
+    fontSize: 16
   },
   responseContainer: {
-    backgroundColor: '#f8f8f8',
     borderRadius: 8,
     padding: 16,
     marginBottom: 20,
@@ -60,16 +54,13 @@ export const voiceAssistantStyles = StyleSheet.create({
   commandText: {
     fontSize: 16,
     marginBottom: 8,
-    fontWeight: '500',
-    color: '#333'
+    fontWeight: '500'
   },
   responseText: {
-    fontSize: 16,
-    color: '#555'
+    fontSize: 16
   },
   hintText: {
     fontSize: 16,
-    color: '#999',
     fontStyle: 'italic',
     textAlign: 'center'
   },
@@ -79,14 +70,12 @@ export const voiceAssistantStyles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
     borderRadius: 25,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginRight: 10
   },
   sendButton: {
-    backgroundColor: '#007AFF',
     width: 50,
     height: 50,
     borderRadius: 25,
@@ -94,11 +83,10 @@ export const voiceAssistantStyles = StyleSheet.create({
     alignItems: 'center'
   },
   errorText: {
-    color: 'red',
     marginTop: 10
   },
   
-  // New styles for Leon connection
+  // Connection styles
   connectingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -106,8 +94,7 @@ export const voiceAssistantStyles = StyleSheet.create({
   },
   connectingText: {
     marginTop: 16,
-    fontSize: 16,
-    color: '#666'
+    fontSize: 16
   },
   errorContainer: {
     alignItems: 'center',
@@ -116,18 +103,15 @@ export const voiceAssistantStyles = StyleSheet.create({
   errorTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#f44336',
     marginTop: 10,
     marginBottom: 5
   },
   errorText: {
     fontSize: 14,
     textAlign: 'center',
-    color: '#666',
     marginBottom: 20
   },
   retryButton: {
-    backgroundColor: '#007AFF',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20
@@ -143,10 +127,10 @@ export const voiceAssistantStyles = StyleSheet.create({
     marginRight: 5
   },
   statusConnected: {
-    backgroundColor: 'green'
+    // Use theme.success in component
   },
   statusDisconnected: {
-    backgroundColor: 'red'
+    // Use theme.danger in component
   },
   statusContainer: {
     flexDirection: 'row',
@@ -154,7 +138,6 @@ export const voiceAssistantStyles = StyleSheet.create({
     marginTop: 5
   },
   statusText: {
-    fontSize: 12,
-    color: '#666'
+    fontSize: 12
   }
 });

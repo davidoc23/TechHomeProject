@@ -7,10 +7,12 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert
+  Alert,
+  StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import LoginStyles from '../styles/LoginScreenStyle';
 
@@ -18,6 +20,7 @@ export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const { theme } = useTheme();
   const [isLogin, setIsLogin] = useState(true); // Toggle between login and register
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -63,30 +66,93 @@ export default function LoginScreen({ navigation }) {
     return <LoadingSpinner />;
   }
 
+  // Import theme utilities
+  const { applyThemeToComponents } = require('../theme/utils');
+  
+  // Get common theme styles
+  const themeStyles = applyThemeToComponents(theme);
+  
+  // Screen-specific styles
+  const screenStyles = {
+    container: {
+      ...LoginStyles.container,
+      backgroundColor: theme.background,
+    },
+    formContainer: {
+      ...LoginStyles.formContainer,
+      backgroundColor: theme.cardBackground,
+      ...theme.shadow,
+    },
+    logoText: {
+      ...LoginStyles.logoText,
+      color: theme.primary,
+    },
+    tagline: {
+      ...LoginStyles.tagline, 
+      color: theme.textSecondary,
+    },
+    formTitle: {
+      ...LoginStyles.formTitle,
+      color: theme.text,
+    },
+    errorContainer: {
+      ...LoginStyles.errorContainer,
+      backgroundColor: theme.danger + '20',
+    },
+    errorText: {
+      ...LoginStyles.errorText,
+      color: theme.danger,
+    },
+    input: {
+      ...LoginStyles.input,
+      backgroundColor: theme.background,
+      color: theme.text,
+      borderColor: theme.border,
+    },
+    submitButton: {
+      ...LoginStyles.submitButton,
+      backgroundColor: theme.primary,
+    },
+    forgotPasswordText: {
+      ...LoginStyles.forgotPasswordText,
+      color: theme.primary,
+    },
+    switchText: {
+      ...LoginStyles.switchText, 
+      color: theme.textSecondary,
+    },
+    switchButton: {
+      ...LoginStyles.switchButton, 
+      color: theme.primary,
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={LoginStyles.container}>
+      <StatusBar barStyle={theme.statusBar} />
+      <ScrollView contentContainerStyle={screenStyles.container}>
         <View style={LoginStyles.logoContainer}>
-          <Text style={LoginStyles.logoText}>TechHome</Text>
-          <Text style={LoginStyles.tagline}>Your Smart Home Control Center</Text>
+          <Text style={screenStyles.logoText}>TechHome</Text>
+          <Text style={screenStyles.tagline}>Your Smart Home Control Center</Text>
         </View>
 
-        <View style={LoginStyles.formContainer}>
-          <Text style={LoginStyles.formTitle}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
+        <View style={screenStyles.formContainer}>
+          <Text style={screenStyles.formTitle}>{isLogin ? 'Sign In' : 'Create Account'}</Text>
           
           {error && (
-            <View style={LoginStyles.errorContainer}>
-              <Text style={LoginStyles.errorText}>{error}</Text>
+            <View style={screenStyles.errorContainer}>
+              <Text style={screenStyles.errorText}>{error}</Text>
             </View>
           )}
 
           <View style={LoginStyles.inputGroup}>
-            <Ionicons name="person-outline" size={22} color="#777" style={LoginStyles.inputIcon} />
+            <Ionicons name="person-outline" size={22} color={theme.textSecondary} style={LoginStyles.inputIcon} />
             <TextInput
-              style={LoginStyles.input}
+              style={screenStyles.input}
+              placeholderTextColor={theme.textTertiary}
               placeholder="Username"
               value={username}
               onChangeText={setUsername}
@@ -96,10 +162,11 @@ export default function LoginScreen({ navigation }) {
 
           {!isLogin && (
             <View style={LoginStyles.inputGroup}>
-              <Ionicons name="mail-outline" size={22} color="#777" style={LoginStyles.inputIcon} />
+              <Ionicons name="mail-outline" size={22} color={theme.textSecondary} style={LoginStyles.inputIcon} />
               <TextInput
-                style={LoginStyles.input}
-                placeholder="Email"
+                style={[LoginStyles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                placeholderTextColor={theme.textTertiary}
+              placeholder="Email"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -111,7 +178,8 @@ export default function LoginScreen({ navigation }) {
           <View style={LoginStyles.inputGroup}>
             <Ionicons name="lock-closed-outline" size={22} color="#777" style={LoginStyles.inputIcon} />
             <TextInput
-              style={LoginStyles.input}
+              style={[LoginStyles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+              placeholderTextColor={theme.textTertiary}
               placeholder="Password"
               value={password}
               onChangeText={setPassword}
@@ -133,20 +201,22 @@ export default function LoginScreen({ navigation }) {
           {!isLogin && (
             <>
               <View style={LoginStyles.inputGroup}>
-                <Ionicons name="person-outline" size={22} color="#777" style={LoginStyles.inputIcon} />
+                <Ionicons name="person-outline" size={22} color={theme.textSecondary} style={LoginStyles.inputIcon} />
                 <TextInput
-                  style={LoginStyles.input}
-                  placeholder="First Name (Optional)"
+                  style={[LoginStyles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                  placeholderTextColor={theme.textTertiary}
+              placeholder="First Name (Optional)"
                   value={firstName}
                   onChangeText={setFirstName}
                 />
               </View>
 
               <View style={LoginStyles.inputGroup}>
-                <Ionicons name="person-outline" size={22} color="#777" style={LoginStyles.inputIcon} />
+                <Ionicons name="person-outline" size={22} color={theme.textSecondary} style={LoginStyles.inputIcon} />
                 <TextInput
-                  style={LoginStyles.input}
-                  placeholder="Last Name (Optional)"
+                  style={[LoginStyles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                  placeholderTextColor={theme.textTertiary}
+              placeholder="Last Name (Optional)"
                   value={lastName}
                   onChangeText={setLastName}
                 />
@@ -154,7 +224,10 @@ export default function LoginScreen({ navigation }) {
             </>
           )}
 
-          <TouchableOpacity style={LoginStyles.submitButton} onPress={handleSubmit}>
+          <TouchableOpacity 
+            style={screenStyles.submitButton}
+            onPress={handleSubmit}
+          >
             <Text style={LoginStyles.submitButtonText}>
               {isLogin ? 'Sign In' : 'Create Account'}
             </Text>
@@ -162,16 +235,16 @@ export default function LoginScreen({ navigation }) {
           
           {isLogin && (
             <TouchableOpacity style={LoginStyles.forgotPassword}>
-              <Text style={LoginStyles.forgotPasswordText}>Forgot Password?</Text>
+              <Text style={screenStyles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
           )}
           
           <View style={LoginStyles.switchContainer}>
-            <Text style={LoginStyles.switchText}>
+            <Text style={screenStyles.switchText}>
               {isLogin ? "Don't have an account? " : "Already have an account? "}
             </Text>
             <TouchableOpacity onPress={toggleForm}>
-              <Text style={LoginStyles.switchButton}>
+              <Text style={screenStyles.switchButton}>
                 {isLogin ? 'Sign Up' : 'Sign In'}
               </Text>
             </TouchableOpacity>
