@@ -1,6 +1,33 @@
 import { StyleSheet } from 'react-native';
 
 export const voiceAssistantStyles = StyleSheet.create({
+  // New styles for device processing
+  processingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    padding: 10,
+    borderRadius: 8,
+  },
+  processingText: {
+    fontSize: 16,
+    color: '#007AFF',
+    marginLeft: 10,
+  },
+  deviceUpdateContainer: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+    paddingTop: 10,
+  },
+  deviceUpdateText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
