@@ -11,6 +11,8 @@ rooms_collection = db['rooms']
 automations_collection = db['automations']
 users_collection = db['users']
 refresh_tokens_collection = db['refresh_tokens']
+device_history_collection = db['device_history']
+prediction_feedback_collection = db['prediction_feedback']
 
 # Create indexes for users collection
 users_collection.create_index("email", unique=True)
