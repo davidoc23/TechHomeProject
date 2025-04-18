@@ -8,6 +8,7 @@ from routes.room_routes import room_routes
 from routes.automation_routes import automation_routes
 from routes.home_assistant_routes import home_assistant_routes
 from routes.auth_routes import auth_routes
+from routes.ml_routes import ml_routes
 import db
 
 app = Flask(__name__)
@@ -60,7 +61,12 @@ def home():
                 "devices_by_room": "/api/devices/by-room/<room_id>"
             },
             "automations": "/api/automations",
-            "home_assistant": "/api/home-assistant"
+            "home_assistant": "/api/home-assistant",
+            "ml": {
+                "predict_device": "/api/ml/predict/device/<device_id>",
+                "suggestions": "/api/ml/suggestions",
+                "feedback": "/api/ml/feedback"
+            }
         }
     })
 
@@ -339,6 +345,7 @@ app.register_blueprint(device_routes, url_prefix='/api/devices')
 app.register_blueprint(room_routes, url_prefix='/api/rooms')
 app.register_blueprint(automation_routes, url_prefix='/api/automations')
 app.register_blueprint(home_assistant_routes, url_prefix='/api/home-assistant')
+app.register_blueprint(ml_routes, url_prefix='/api/ml')
 
 # Initialize admin user if needed
 #@app.before_first_request

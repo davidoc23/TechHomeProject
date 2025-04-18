@@ -168,3 +168,7 @@ def update_device_history(device_id, state, user_id=None):
         device_predictor.train_model_for_device(str(device_id))
     except Exception as e:
         print(f"Error training model for device {device_id}: {e}")
+
+def get_device_suggestions():
+    """Get AI suggestions for device states"""
+    return device_predictor.get_device_suggestions()
