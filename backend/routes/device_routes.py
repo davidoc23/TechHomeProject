@@ -4,6 +4,13 @@ from flask import Blueprint, jsonify, request
 from bson import ObjectId
 from db import devices_collection, rooms_collection
 from dotenv import load_dotenv
+# Import ML functionality (will gracefully skip if not available)
+try:
+    from ml_models import update_device_history
+except ImportError:
+    # Define a dummy function if ML module isn't available
+    def update_device_history(device_id, state, user_id=None):
+        pass
 
 # Load environment variables
 load_dotenv()
@@ -194,6 +201,13 @@ def toggle_device(device_id):
             {"_id": ObjectId(device_id)},
             {"$set": {"isOn": new_state}}
         )
+        
+        # Record device state change for ML model
+        try:
+            user_id = request.headers.get('X-User-ID')
+            update_device_history(device_id, new_state, user_id)
+        except Exception as e:
+            print(f"Warning: Failed to update device history for ML: {e}")
 
         # Return full updated device object for frontend
         updated_device = {
@@ -252,6 +266,13 @@ def toggle_all_lights():
                 {"_id": ObjectId(device["_id"])},
                 {"$set": {"isOn": desired_state}}
             )
+            
+            # Record device state change for ML model
+            try:
+                user_id = request.headers.get('X-User-ID')
+                update_device_history(str(device["_id"]), desired_state, user_id)
+            except Exception as e:
+                print(f"Warning: Failed to update device history for ML: {e}")
 
             # Append updated device state
             updated_lights.append({
