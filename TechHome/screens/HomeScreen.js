@@ -8,6 +8,7 @@ import { ErrorMessage } from '../components/ui/ErrorMessage';
 import { useDeviceContext, DEVICE_EVENTS } from '../context/DeviceContext';
 import { useTheme } from '../context/ThemeContext';
 import { LeonVoiceAssistant } from '../components/ui/LeonVoiceAssistant';
+import { AIDeviceSuggestions } from '../components/ui/AIDeviceSuggestions';
 
 export default function HomeScreen() {
   const { devices, activities, error, isLoading, fetchDevices, toggleDevice, toggleAllLights } = useDevices();
@@ -171,6 +172,9 @@ export default function HomeScreen() {
         visible={voiceModalVisible}
         onClose={() => setVoiceModalVisible(false)}
       />
+
+      {/* AI Smart Suggestions */}
+      <AIDeviceSuggestions />
 
     </ScrollView>
   );
