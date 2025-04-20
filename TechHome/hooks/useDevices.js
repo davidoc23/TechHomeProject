@@ -1,4 +1,5 @@
 import { useDeviceContext, DEVICE_EVENTS } from '../context/DeviceContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 //const API_URL = 'http://localhost:5000/api';
 const ROOMS_API_URL = 'http://localhost:5000/api/rooms';
@@ -66,6 +67,26 @@ export function useDevices() {
                 // Apply the update from the server immediately
                 updateDevice(id, { isOn: updatedDevice.isOn });
                 
+                // Store this device in recent devices list for ML purposes
+                try {
+                    const recentDevices = JSON.parse(await AsyncStorage.getItem('recentDevices') || '[]');
+                    const deviceIndex = recentDevices.findIndex(d => d.id === id);
+                    
+                    // Remove if exists
+                    if (deviceIndex >= 0) {
+                        recentDevices.splice(deviceIndex, 1);
+                    }
+                    
+                    // Add to front
+                    recentDevices.unshift(updatedDevice);
+                    
+                    // Keep only last 5
+                    const trimmedRecent = recentDevices.slice(0, 5);
+                    await AsyncStorage.setItem('recentDevices', JSON.stringify(trimmedRecent));
+                } catch (storageErr) {
+                    console.warn('Failed to update recent devices:', storageErr);
+                }
+                
                 // Broadcast the device toggle event to all components
                 emitDeviceEvent(DEVICE_EVENTS.DEVICE_TOGGLED, updatedDevice);
     
@@ -125,6 +146,27 @@ export function useDevices() {
                 updatedLights.forEach(device => {
                     addActivity(device.name, desiredState ? 'turned on' : 'turned off');
                 });
+                
+                // Update recent devices list for all affected lights
+                try {
+                    const recentDevices = JSON.parse(await AsyncStorage.getItem('recentDevices') || '[]');
+                    let updated = false;
+                    
+                    // Update any lights that are already in recent devices
+                    for (let light of updatedLights) {
+                        const deviceIndex = recentDevices.findIndex(d => d.id === light.id);
+                        if (deviceIndex >= 0) {
+                            recentDevices[deviceIndex] = {...recentDevices[deviceIndex], isOn: light.isOn};
+                            updated = true;
+                        }
+                    }
+                    
+                    if (updated) {
+                        await AsyncStorage.setItem('recentDevices', JSON.stringify(recentDevices));
+                    }
+                } catch (storageErr) {
+                    console.warn('Failed to update recent devices:', storageErr);
+                }
             } else {
                 const errorData = await response.json();
                 // DEBUG - console.error(`❌ Error toggling all lights: ${errorData.error}`);
@@ -155,6 +197,19 @@ export function useDevices() {
                     device.id === id ? updatedDevice : device
                 ));
                 addActivity(updatedDevice.name, `temperature set to ${newTemp}°F`);
+                
+                // Update in recent devices if present
+                try {
+                    const recentDevices = JSON.parse(await AsyncStorage.getItem('recentDevices') || '[]');
+                    const deviceIndex = recentDevices.findIndex(d => d.id === id);
+                    
+                    if (deviceIndex >= 0) {
+                        recentDevices[deviceIndex] = {...recentDevices[deviceIndex], temperature: newTemp};
+                        await AsyncStorage.setItem('recentDevices', JSON.stringify(recentDevices));
+                    }
+                } catch (storageErr) {
+                    console.warn('Failed to update recent devices:', storageErr);
+                }
             }
         } catch (err) {
             setError('Failed to set temperature');
@@ -209,9 +264,35 @@ export function useDevices() {
                 if (device) {
                     addActivity(device.name, 'removed from system');
                 }
+                
+                // Remove from recent devices if present
+                try {
+                    const recentDevices = JSON.parse(await AsyncStorage.getItem('recentDevices') || '[]');
+                    const updatedRecent = recentDevices.filter(d => d.id !== id);
+                    
+                    if (updatedRecent.length !== recentDevices.length) {
+                        await AsyncStorage.setItem('recentDevices', JSON.stringify(updatedRecent));
+                    }
+                } catch (storageErr) {
+                    console.warn('Failed to update recent devices:', storageErr);
+                }
             }
         } catch (err) {
             setError('Failed to remove device');
+        }
+    };
+
+    /**
+     * Gets the user's recent devices from AsyncStorage
+     * @returns {Promise<Array>} Array of recent devices or empty array if none
+     */
+    const getRecentDevices = async () => {
+        try {
+            const recentDevices = await AsyncStorage.getItem('recentDevices');
+            return recentDevices ? JSON.parse(recentDevices) : [];
+        } catch (err) {
+            console.warn('Failed to get recent devices:', err);
+            return [];
         }
     };
 
@@ -334,7 +415,7 @@ export function useDevices() {
         editRoom,
         addAutomation,
         removeAutomation,
-        toggleAutomation
-
+        toggleAutomation,
+        getRecentDevices
     };
 }

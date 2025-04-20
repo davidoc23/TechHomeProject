@@ -11,7 +11,7 @@ export function AIDeviceSuggestions() {
     const [suggestions, setSuggestions] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
-    const { toggleDevice } = useDevices();
+    const { toggleDevice, getRecentDevices } = useDevices();
     const { theme } = useTheme();
 
     // Fetch suggestions from the API
@@ -24,8 +24,8 @@ export function AIDeviceSuggestions() {
             
             if (!token) {
                 console.warn('No access token, using mock suggestions');
-                // Generate mock suggestion for testing
-                const recentDevices = JSON.parse(await AsyncStorage.getItem('recentDevices') || '[]');
+                // Generate mock suggestion from recent devices
+                const recentDevices = await getRecentDevices();
                 if (recentDevices.length > 0) {
                     const mockSuggestions = [{
                         device_id: recentDevices[0].id,
@@ -70,8 +70,8 @@ export function AIDeviceSuggestions() {
                 // Provide mock suggestions for testing when ML service is unavailable
                 const mockSuggestions = [];
                 
-                // Only use mock data if we have devices in the app
-                const recentDevices = JSON.parse(await AsyncStorage.getItem('recentDevices') || '[]');
+                // Use recent devices to generate relevant suggestions
+                const recentDevices = await getRecentDevices();
                 
                 if (recentDevices.length > 0) {
                     // Use most recently accessed device for a mock suggestion
@@ -83,6 +83,18 @@ export function AIDeviceSuggestions() {
                         suggested_state: !lastDevice.isOn, // Suggest opposite of current state
                         confidence: 0.85
                     });
+                    
+                    // If we have more than one recent device, occasionally suggest another one
+                    if (recentDevices.length > 1 && Math.random() > 0.7) {
+                        const secondDevice = recentDevices[1];
+                        mockSuggestions.push({
+                            device_id: secondDevice.id,
+                            name: secondDevice.name,
+                            current_state: secondDevice.isOn,
+                            suggested_state: !secondDevice.isOn,
+                            confidence: 0.75
+                        });
+                    }
                 }
                 
                 setSuggestions(mockSuggestions);
