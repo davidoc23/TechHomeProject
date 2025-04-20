@@ -95,13 +95,66 @@ export function AIDeviceSuggestions() {
         }
     };
     
-    // Fetch suggestions on component mount
+    // Send feedback about a suggestion
+    const sendFeedback = async (deviceId, accepted) => {
+        try {
+            const token = await AsyncStorage.getItem('accessToken');
+            
+            // Headers for request
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            // Add token if available
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            await fetch(`${API_URL}/ml/feedback`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    device_id: deviceId,
+                    accepted
+                })
+            });
+        } catch (err) {
+            console.error('Error sending suggestion feedback:', err);
+        }
+    };
+    
+    // Handle suggestion acceptance
+    const acceptSuggestion = async (deviceId, suggestedState) => {
+        try {
+            // Toggle device through our usual flow
+            await toggleDevice(deviceId);
+            
+            // Remove from suggestions
+            setSuggestions(suggestions.filter(s => s.device_id !== deviceId));
+            
+            // Send positive feedback
+            await sendFeedback(deviceId, true);
+        } catch (err) {
+            console.error('Error accepting suggestion:', err);
+        }
+    };
+    
+    // Handle suggestion dismissal
+    const dismissSuggestion = async (deviceId) => {
+        // Remove from suggestions
+        setSuggestions(suggestions.filter(s => s.device_id !== deviceId));
+        
+        // Send negative feedback
+        await sendFeedback(deviceId, false);
+    };
+    
+    // Fetch suggestions on component mount and every 5 minutes
     useEffect(() => {
         fetchSuggestions();
         
         const interval = setInterval(() => {
             fetchSuggestions();
-        }, 5 * 60 * 1000); // Refresh every 5 minutes
+        }, 5 * 60 * 1000);
         
         return () => clearInterval(interval);
     }, []);
@@ -129,22 +182,14 @@ export function AIDeviceSuggestions() {
                     <View style={aiSuggestionStyles.actionButtons}>
                         <TouchableOpacity 
                             style={[aiSuggestionStyles.actionButton, aiSuggestionStyles.acceptButton, { backgroundColor: theme.primary }]}
-                            onPress={() => {
-                                // Just toggle the device at this stage
-                                toggleDevice(suggestion.device_id);
-                                // Remove from suggestions list
-                                setSuggestions(suggestions.filter(s => s.device_id !== suggestion.device_id));
-                            }}
+                            onPress={() => acceptSuggestion(suggestion.device_id, suggestion.suggested_state)}
                         >
                             <Text style={aiSuggestionStyles.buttonText}>Accept</Text>
                         </TouchableOpacity>
                         
                         <TouchableOpacity 
                             style={[aiSuggestionStyles.actionButton, aiSuggestionStyles.dismissButton, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}
-                            onPress={() => {
-                                // Just remove from suggestions list
-                                setSuggestions(suggestions.filter(s => s.device_id !== suggestion.device_id));
-                            }}
+                            onPress={() => dismissSuggestion(suggestion.device_id)}
                         >
                             <Text style={[aiSuggestionStyles.buttonText, { color: theme.textSecondary }]}>Dismiss</Text>
                         </TouchableOpacity>

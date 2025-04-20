@@ -137,6 +137,36 @@ class DeviceUsagePredictor:
             'probability': float(probability),
             'current_state': bool(previous_state)
         }
+    
+    def get_device_suggestions(self):
+        """Get suggestions for devices that should be toggled based on predictions"""
+        
+        suggestions = []
+        devices = list(db.devices_collection.find())
+        
+        for device in devices:
+            device_id = str(device['_id'])
+            prediction = self.predict_device_state(device_id)
+            
+            if prediction is None:
+                continue
+                
+            current_state = device.get('isOn', False)
+            predicted_state = prediction['prediction']
+            probability = prediction['probability']
+            
+            # Only suggest changes with high confidence
+            if current_state != predicted_state and probability > 0.7:
+                suggestions.append({
+                    'device_id': device_id,
+                    'name': device.get('name', 'Unknown Device'),
+                    'current_state': current_state,
+                    'suggested_state': predicted_state,
+                    'confidence': probability
+                })
+        
+        return suggestions
+
 
 # Initialize the predictor
 device_predictor = DeviceUsagePredictor()
