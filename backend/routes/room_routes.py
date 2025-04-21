@@ -53,12 +53,14 @@ def update_room(room_id):
             {"$set": {"name": data['name']}}
         )
         
-        if result.modified_count:
-            updated_room = rooms_collection.find_one({"_id": ObjectId(room_id)})
-            updated_room['id'] = str(updated_room['_id'])
-            del updated_room['_id']
-            return jsonify(updated_room)
-        return jsonify({"error": "Room not found"}), 404
+        if result.matched_count == 0:
+            return jsonify({"error": "Room not found"}), 404
+
+        updated_room = rooms_collection.find_one({"_id": ObjectId(room_id)})
+        updated_room['id'] = str(updated_room['_id'])
+        del updated_room['_id']
+        return jsonify(updated_room)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
