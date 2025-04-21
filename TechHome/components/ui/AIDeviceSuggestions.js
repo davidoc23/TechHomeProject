@@ -12,8 +12,92 @@ export function AIDeviceSuggestions() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [lastFetchTime, setLastFetchTime] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const { toggleDevice, getRecentDevices } = useDevices();
     const { theme } = useTheme();
+
+    // Check authentication status on mount
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const token = await AsyncStorage.getItem('accessToken');
+                setIsAuthenticated(!!token);
+            } catch (err) {
+                console.error('Error checking authentication:', err);
+                setIsAuthenticated(false);
+            }
+        };
+        
+        checkAuth();
+    }, []);
+
+    // Get fresh token for API requests
+    const getAuthHeaders = async () => {
+        try {
+            const token = await AsyncStorage.getItem('accessToken');
+            
+            if (!token) {
+                return { 'Content-Type': 'application/json' };
+            }
+            
+            // Check if token needs refresh
+            const tokenExpiry = await AsyncStorage.getItem('tokenExpiry');
+            const now = Date.now();
+            
+            if (tokenExpiry && parseInt(tokenExpiry) < now) {
+                // Token expired, attempt refresh
+                const refreshToken = await AsyncStorage.getItem('refreshToken');
+                
+                if (refreshToken) {
+                    try {
+                        const refreshResponse = await fetch(`${API_URL}/auth/refresh`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ refresh_token: refreshToken })
+                        });
+                        
+                        if (refreshResponse.ok) {
+                            const tokenData = await refreshResponse.json();
+                            
+                            // Save new tokens
+                            await AsyncStorage.setItem('accessToken', tokenData.access_token);
+                            await AsyncStorage.setItem('refreshToken', tokenData.refresh_token);
+                            
+                            // Calculate expiry (subtract 30 seconds for safety margin)
+                            const expiry = Date.now() + (tokenData.expires_in * 1000) - 30000;
+                            await AsyncStorage.setItem('tokenExpiry', expiry.toString());
+                            
+                            setIsAuthenticated(true);
+                            return {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${tokenData.access_token}`
+                            };
+                        } else {
+                            // Refresh failed, user needs to login again
+                            setIsAuthenticated(false);
+                            return { 'Content-Type': 'application/json' };
+                        }
+                    } catch (err) {
+                        console.error('Token refresh error:', err);
+                        setIsAuthenticated(false);
+                        return { 'Content-Type': 'application/json' };
+                    }
+                }
+            } else {
+                // Token valid, use it
+                setIsAuthenticated(true);
+                return {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                };
+            }
+        } catch (err) {
+            console.error('Error getting auth headers:', err);
+            return { 'Content-Type': 'application/json' };
+        }
+        
+        return { 'Content-Type': 'application/json' };
+    };
 
     // Fetch suggestions from the API
     const fetchSuggestions = async (force = false) => {
@@ -27,40 +111,43 @@ export function AIDeviceSuggestions() {
         setError(null);
         
         try {
-            const token = await AsyncStorage.getItem('accessToken');
+            // Get fresh auth headers
+            const headers = await getAuthHeaders();
             
-            // For testing/development - return mock suggestions if ML endpoint fails
+            // Try to fetch from the API first
             try {
-                // For testing, don't require token
-                const headers = {
-                    'Content-Type': 'application/json'
-                };
-                
-                // Add token if available
-                if (token) {
-                    headers['Authorization'] = `Bearer ${token}`;
-                }
-                
                 const response = await fetch(`${API_URL}/ml/suggestions`, {
                     method: 'GET',
                     headers,
-                    // Add short timeout to prevent hanging
                     timeout: 5000
                 });
             
                 if (!response.ok) {
+                    // If unauthorized, clear authenticated status
+                    if (response.status === 401) {
+                        setIsAuthenticated(false);
+                    }
                     throw new Error('Failed to fetch AI suggestions');
                 }
                 
                 const data = await response.json();
                 setSuggestions(data.suggestions || []);
                 setLastFetchTime(now);
+                return;
             } catch (err) {
+                // API fetch failed, fall back to local suggestions
                 console.error('Error fetching AI suggestions:', err);
-                // Provide mock suggestions for testing when ML service is unavailable
-                const mockSuggestions = [];
                 
-                // Use recent devices to generate relevant suggestions
+                // If not authenticated, don't show mock suggestions
+                if (!isAuthenticated) {
+                    setError('Please login to get smart device suggestions');
+                    setSuggestions([]);
+                    setLastFetchTime(now);
+                    return;
+                }
+                
+                // Generate mock suggestions from recent device history
+                const mockSuggestions = [];
                 const recentDevices = await getRecentDevices();
                 
                 if (recentDevices.length > 0) {
@@ -101,16 +188,12 @@ export function AIDeviceSuggestions() {
     // Send feedback about a suggestion
     const sendFeedback = async (deviceId, accepted) => {
         try {
-            const token = await AsyncStorage.getItem('accessToken');
+            const headers = await getAuthHeaders();
             
-            // Headers for request
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            
-            // Add token if available
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
+            // Don't send feedback if not authenticated
+            if (!isAuthenticated || !headers.Authorization) {
+                console.warn('Not sending feedback - user not authenticated');
+                return;
             }
             
             const response = await fetch(`${API_URL}/ml/feedback`, {
@@ -139,8 +222,10 @@ export function AIDeviceSuggestions() {
                 prevSuggestions.filter(s => s.device_id !== deviceId)
             );
             
-            // Send positive feedback
-            await sendFeedback(deviceId, true);
+            // Send positive feedback if authenticated
+            if (isAuthenticated) {
+                await sendFeedback(deviceId, true);
+            }
             
             // Toggle device through our usual flow
             await toggleDevice(deviceId);
@@ -161,18 +246,26 @@ export function AIDeviceSuggestions() {
             prevSuggestions.filter(s => s.device_id !== deviceId)
         );
         
-        // Send negative feedback
-        try {
-            await sendFeedback(deviceId, false);
-        } catch (err) {
-            console.warn('Failed to send dismiss feedback:', err);
-            // Silent failure - dismissing should always feel successful
+        // Send negative feedback if authenticated
+        if (isAuthenticated) {
+            try {
+                await sendFeedback(deviceId, false);
+            } catch (err) {
+                console.warn('Failed to send dismiss feedback:', err);
+            }
         }
     };
     
     // Refresh suggestions
     const refreshSuggestions = () => {
         fetchSuggestions(true);
+    };
+    
+    // Login button handler
+    const handleLogin = () => {
+        // Navigate to login screen
+        // This would be implemented by the parent component
+        console.log('User should be directed to login screen');
     };
     
     // Fetch suggestions on component mount and every 5 minutes
@@ -184,7 +277,27 @@ export function AIDeviceSuggestions() {
         }, 5 * 60 * 1000);
         
         return () => clearInterval(interval);
-    }, []);
+    }, [isAuthenticated]); // Refetch when auth status changes
+    
+    // Authentication required but not logged in
+    if (!isAuthenticated) {
+        return (
+            <View style={[aiSuggestionStyles.container, { backgroundColor: theme.cardBackground }]}>
+                <Text style={[aiSuggestionStyles.title, { color: theme.textPrimary }]}>
+                    <Ionicons name="bulb-outline" size={18} color={theme.primary} /> Smart Suggestions
+                </Text>
+                <Text style={[aiSuggestionStyles.messageText, { color: theme.textSecondary }]}>
+                    Login to get personalized device suggestions based on your usage patterns.
+                </Text>
+                <TouchableOpacity 
+                    style={[aiSuggestionStyles.loginButton, { backgroundColor: theme.primary }]}
+                    onPress={handleLogin}
+                >
+                    <Text style={aiSuggestionStyles.buttonText}>Login</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
     
     if (isLoading && suggestions.length === 0) {
         return (

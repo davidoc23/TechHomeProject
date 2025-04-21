@@ -76,5 +76,17 @@ export const aiSuggestionStyles = StyleSheet.create({
         borderRadius: 4,
         borderWidth: 1,
         alignSelf: 'center'
+    },
+    messageText: {
+        fontSize: 14,
+        textAlign: 'center',
+        marginBottom: 16
+    },
+    loginButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 20,
+        borderRadius: 4,
+        alignSelf: 'center',
+        marginTop: 8
     }
 });

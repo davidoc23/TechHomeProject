@@ -15,6 +15,9 @@ def predict_device_state(device_id):
     Predict if a device should be on or off based on usage patterns
     """
     try:
+        # Get user ID from JWT for personalized predictions
+        user_id = get_jwt_identity()
+        
         # Verify device exists
         device = db.devices_collection.find_one({"_id": ObjectId(device_id)})
         if not device:
@@ -46,13 +49,15 @@ def predict_device_state(device_id):
         return jsonify({"error": str(e)}), 500
 
 @ml_routes.route('/suggestions', methods=['GET'])
-# Temporarily remove JWT requirement for testing
-# @jwt_required()
+@jwt_required()
 def get_suggestions():
     """
     Get AI suggestions for devices that should be toggled
     """
     try:
+        # Get user ID from JWT for personalized suggestions
+        user_id = get_jwt_identity()
+        
         # Get real suggestions if available
         suggestions = get_device_suggestions()
         
@@ -86,19 +91,22 @@ def get_suggestions():
         return jsonify({
             "suggestions": suggestions,
             "suggested_count": len(suggestions),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
+            "user_id": user_id  # Include user ID for frontend reference
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @ml_routes.route('/feedback', methods=['POST'])
-# Temporarily remove JWT requirement for testing
-# @jwt_required()
+@jwt_required()
 def feedback():
     """
     Receive feedback about a prediction to improve the model
     """
     try:
+        # Get user ID from JWT for personalized learning
+        user_id = get_jwt_identity()
+        
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing request body"}), 400
@@ -109,14 +117,7 @@ def feedback():
         if not device_id:
             return jsonify({"error": "Missing device_id parameter"}), 400
             
-        # Log the feedback
-        try:
-            # Try to get the user ID from JWT
-            user_id = get_jwt_identity()
-        except:
-            # Use a default user if JWT is unavailable
-            user_id = "test_user"
-            
+        # Log the feedback with the authenticated user
         db.prediction_feedback_collection.insert_one({
             "device_id": ObjectId(device_id),
             "user_id": user_id,
@@ -127,7 +128,8 @@ def feedback():
         return jsonify({
             "message": "Feedback received",
             "device_id": device_id,
-            "accepted": accepted
+            "accepted": accepted,
+            "user_id": user_id
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
