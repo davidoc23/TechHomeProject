@@ -4,7 +4,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import joblib
 import os
 from bson import ObjectId
@@ -40,7 +40,7 @@ class DeviceUsagePredictor:
         # Create dataset from history
         data = []
         for entry in device_history:
-            timestamp = entry.get('timestamp', datetime.utcnow())
+            timestamp = entry.get('timestamp', datetime.now(timezone.utc))
             if not isinstance(timestamp, datetime):
                 timestamp = datetime.fromisoformat(timestamp)
                 
@@ -97,7 +97,7 @@ class DeviceUsagePredictor:
         """Predict if a device should be on or off at a given time"""
         
         if time is None:
-            time = datetime.utcnow()
+            time = datetime.now(timezone.utc)
             
         # Check if model exists
         model_path = os.path.join(self.model_dir, f'device_{device_id}.joblib')
@@ -184,7 +184,7 @@ def update_device_history(device_id, state, user_id=None):
     # Log the state change
     history_entry = {
         'device_id': device_id_obj,
-        'timestamp': datetime.utcnow(),
+        'timestamp': datetime.now(timezone.utc),
         'previous_state': previous_state,
         'state': state,
         'user_id': user_id
