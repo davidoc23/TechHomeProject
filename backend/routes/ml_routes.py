@@ -4,6 +4,7 @@ from bson import ObjectId
 import db
 from ml_models import device_predictor, get_device_suggestions, update_device_history
 from datetime import datetime, timedelta
+import random
 
 ml_routes = Blueprint('ml_routes', __name__)
 
@@ -61,13 +62,26 @@ def get_suggestions():
             devices = list(db.devices_collection.find(limit=3))
             if devices:
                 for device in devices:
-                    suggestions.append({
-                        "device_id": str(device["_id"]),
-                        "name": device.get("name", "Unknown Device"),
-                        "current_state": device.get("isOn", False),
-                        "suggested_state": not device.get("isOn", False),
-                        "confidence": 0.85
-                    })
+                    # Only suggest for devices that haven't changed state recently
+                    last_change = db.device_history_collection.find_one(
+                        {"device_id": device["_id"]},
+                        sort=[("timestamp", -1)]
+                    )
+                    
+                    # If no history or last change was more than 30 minutes ago
+                    if not last_change or (datetime.utcnow() - last_change["timestamp"]).total_seconds() > 1800:
+                        confidence = random.uniform(0.75, 0.95)  # Random confidence between 75-95%
+                        suggestions.append({
+                            "device_id": str(device["_id"]),
+                            "name": device.get("name", "Unknown Device"),
+                            "current_state": device.get("isOn", False),
+                            "suggested_state": not device.get("isOn", False),
+                            "confidence": round(confidence, 2)
+                        })
+                        
+                        # Only suggest 1-2 devices at a time for better UX
+                        if len(suggestions) >= 2:
+                            break
         
         return jsonify({
             "suggestions": suggestions,

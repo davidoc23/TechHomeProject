@@ -54,5 +54,27 @@ export const aiSuggestionStyles = StyleSheet.create({
     buttonText: {
         color: 'white',
         fontWeight: '500'
+    },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16
+    },
+    loadingText: {
+        marginLeft: 8,
+        fontSize: 14
+    },
+    errorText: {
+        fontSize: 14,
+        marginBottom: 12,
+        textAlign: 'center'
+    },
+    retryButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 4,
+        borderWidth: 1,
+        alignSelf: 'center'
     }
 });

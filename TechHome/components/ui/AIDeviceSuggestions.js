@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useDevices } from '../../hooks/useDevices';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
@@ -11,34 +11,23 @@ export function AIDeviceSuggestions() {
     const [suggestions, setSuggestions] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [lastFetchTime, setLastFetchTime] = useState(null);
     const { toggleDevice, getRecentDevices } = useDevices();
     const { theme } = useTheme();
 
     // Fetch suggestions from the API
-    const fetchSuggestions = async () => {
+    const fetchSuggestions = async (force = false) => {
+        // Don't refetch if we've fetched in the last minute (unless forced)
+        const now = Date.now();
+        if (!force && lastFetchTime && (now - lastFetchTime < 60000)) {
+            return;
+        }
+        
         setIsLoading(true);
         setError(null);
         
         try {
             const token = await AsyncStorage.getItem('accessToken');
-            
-            if (!token) {
-                console.warn('No access token, using mock suggestions');
-                // Generate mock suggestion from recent devices
-                const recentDevices = await getRecentDevices();
-                if (recentDevices.length > 0) {
-                    const mockSuggestions = [{
-                        device_id: recentDevices[0].id,
-                        name: recentDevices[0].name,
-                        current_state: recentDevices[0].isOn,
-                        suggested_state: !recentDevices[0].isOn,
-                        confidence: 0.92
-                    }];
-                    setSuggestions(mockSuggestions);
-                }
-                setIsLoading(false);
-                return;
-            }
             
             // For testing/development - return mock suggestions if ML endpoint fails
             try {
@@ -56,7 +45,7 @@ export function AIDeviceSuggestions() {
                     method: 'GET',
                     headers,
                     // Add short timeout to prevent hanging
-                    timeout: 3000
+                    timeout: 5000
                 });
             
                 if (!response.ok) {
@@ -65,6 +54,7 @@ export function AIDeviceSuggestions() {
                 
                 const data = await response.json();
                 setSuggestions(data.suggestions || []);
+                setLastFetchTime(now);
             } catch (err) {
                 console.error('Error fetching AI suggestions:', err);
                 // Provide mock suggestions for testing when ML service is unavailable
@@ -98,6 +88,7 @@ export function AIDeviceSuggestions() {
                 }
                 
                 setSuggestions(mockSuggestions);
+                setLastFetchTime(now);
             }
         } catch (err) {
             console.error('Error in suggestion handling:', err);
@@ -122,7 +113,7 @@ export function AIDeviceSuggestions() {
                 headers['Authorization'] = `Bearer ${token}`;
             }
             
-            await fetch(`${API_URL}/ml/feedback`, {
+            const response = await fetch(`${API_URL}/ml/feedback`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
@@ -130,34 +121,58 @@ export function AIDeviceSuggestions() {
                     accepted
                 })
             });
+            
+            if (!response.ok) {
+                console.warn('Failed to send feedback, status:', response.status);
+            }
         } catch (err) {
             console.error('Error sending suggestion feedback:', err);
+            // Silently fail - we don't want to interrupt UX for feedback failures
         }
     };
     
     // Handle suggestion acceptance
     const acceptSuggestion = async (deviceId, suggestedState) => {
         try {
-            // Toggle device through our usual flow
-            await toggleDevice(deviceId);
-            
-            // Remove from suggestions
-            setSuggestions(suggestions.filter(s => s.device_id !== deviceId));
+            // Remove from suggestions immediately for better UX
+            setSuggestions(prevSuggestions => 
+                prevSuggestions.filter(s => s.device_id !== deviceId)
+            );
             
             // Send positive feedback
             await sendFeedback(deviceId, true);
+            
+            // Toggle device through our usual flow
+            await toggleDevice(deviceId);
         } catch (err) {
             console.error('Error accepting suggestion:', err);
+            // Show error but allow retrying
+            setError('Failed to apply suggestion: ' + (err.message || 'Unknown error'));
+            
+            // Refetch suggestions to ensure UI is consistent
+            fetchSuggestions(true);
         }
     };
     
     // Handle suggestion dismissal
     const dismissSuggestion = async (deviceId) => {
-        // Remove from suggestions
-        setSuggestions(suggestions.filter(s => s.device_id !== deviceId));
+        // Remove from suggestions first for responsive UI
+        setSuggestions(prevSuggestions => 
+            prevSuggestions.filter(s => s.device_id !== deviceId)
+        );
         
         // Send negative feedback
-        await sendFeedback(deviceId, false);
+        try {
+            await sendFeedback(deviceId, false);
+        } catch (err) {
+            console.warn('Failed to send dismiss feedback:', err);
+            // Silent failure - dismissing should always feel successful
+        }
+    };
+    
+    // Refresh suggestions
+    const refreshSuggestions = () => {
+        fetchSuggestions(true);
     };
     
     // Fetch suggestions on component mount and every 5 minutes
@@ -170,6 +185,41 @@ export function AIDeviceSuggestions() {
         
         return () => clearInterval(interval);
     }, []);
+    
+    if (isLoading && suggestions.length === 0) {
+        return (
+            <View style={[aiSuggestionStyles.container, { backgroundColor: theme.cardBackground }]}>
+                <Text style={[aiSuggestionStyles.title, { color: theme.textPrimary }]}>
+                    <Ionicons name="bulb-outline" size={18} color={theme.primary} /> Smart Suggestions
+                </Text>
+                <View style={aiSuggestionStyles.loadingContainer}>
+                    <ActivityIndicator size="small" color={theme.primary} />
+                    <Text style={[aiSuggestionStyles.loadingText, { color: theme.textSecondary }]}>
+                        Looking for suggestions...
+                    </Text>
+                </View>
+            </View>
+        );
+    }
+    
+    if (error && suggestions.length === 0) {
+        return (
+            <View style={[aiSuggestionStyles.container, { backgroundColor: theme.cardBackground }]}>
+                <Text style={[aiSuggestionStyles.title, { color: theme.textPrimary }]}>
+                    <Ionicons name="bulb-outline" size={18} color={theme.primary} /> Smart Suggestions
+                </Text>
+                <Text style={[aiSuggestionStyles.errorText, { color: theme.error }]}>
+                    {error}
+                </Text>
+                <TouchableOpacity 
+                    style={[aiSuggestionStyles.retryButton, { borderColor: theme.border }]}
+                    onPress={refreshSuggestions}
+                >
+                    <Text style={{ color: theme.primary }}>Retry</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
     
     if (suggestions.length === 0) {
         return null; // Don't render anything if no suggestions
