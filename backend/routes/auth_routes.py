@@ -263,7 +263,8 @@ def update_current_user():
         update_data['password_hash'] = bcrypt.hash(data['new_password'])
     
     # Update timestamp
-    update_data['updated_at'] = datetime.utcnow()
+    update_data['updated_at'] = datetime.now(timezone.utc)
+
     
     if update_data:
         # Update the user

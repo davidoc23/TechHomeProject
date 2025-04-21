@@ -1,6 +1,6 @@
 from pymongo import MongoClient
 from config import MONGO_URI, DATABASE_NAME
-from datetime import datetime
+from datetime import datetime, timezone
 
 client = MongoClient(MONGO_URI)
 db = client[DATABASE_NAME]
@@ -41,8 +41,8 @@ def create_user(username, email, password_hash, first_name=None, last_name=None,
         "first_name": first_name,
         "last_name": last_name,
         "role": role,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at":datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
         "last_login": None,
         "is_active": True
     }
@@ -66,7 +66,7 @@ def update_last_login(user_id):
     from bson.objectid import ObjectId
     return users_collection.update_one(
         {"_id": ObjectId(user_id)},
-        {"$set": {"last_login": datetime.utcnow()}}
+        {"$set": {"last_login": datetime.now(timezone.utc)}}
     )
 
 def store_refresh_token(user_id, token, expires_at):
@@ -87,7 +87,7 @@ def store_refresh_token(user_id, token, expires_at):
         "user_id": user_id,
         "token": token,
         "jti": token_jti,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "expires_at": expires_at,
         "is_revoked": False
     }
