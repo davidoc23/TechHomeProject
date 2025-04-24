@@ -115,19 +115,18 @@ Make sure to configure your `.env` or `config.py` with:
 
 Navigate to the `backend/` folder, make sure venv is active and run:
 
-```bash
-pytest tests/
-```
-
 Ensure `pytest` is installed:
 
 ```bash
 pip install pytest
 ```
-To run it:
+
 ```bash
-pytest
+pytest tests/
 ```
+
+
+
 
 Includes:
 - `test_auth.py` – Login and registration
@@ -171,6 +170,4 @@ Example endpoints:
 
 ---
 
-## Repository
 
-https://github.com/davidoc23/TechHomeProject
