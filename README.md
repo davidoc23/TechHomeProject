@@ -68,9 +68,6 @@ TechHome/
 │   ├── ml_models.py
 │   ├── routes/
 │   ├── tests/
-│   │   ├── conftest.py
-│   │   ├── test_auth.py
-│   │   ├── test_devices.py
 │   └── requirements.txt
 ├── TechHome/ (React Native App)
 │   ├── App.js
@@ -102,7 +99,7 @@ Requires Expo Go (for mobile testing) or emulator.
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
+.\venv\Scripts\activate  # or source venv/bin/activate mac
 pip install -r requirements.txt
 python app.py
 ```
@@ -116,7 +113,7 @@ Make sure to configure your `.env` or `config.py` with:
 
 ### Running Tests
 
-Navigate to the `backend/` folder and run:
+Navigate to the `backend/` folder, make sure venv is active and run:
 
 ```bash
 pytest tests/
@@ -126,6 +123,10 @@ Ensure `pytest` is installed:
 
 ```bash
 pip install pytest
+```
+To run it:
+```bash
+pytest
 ```
 
 Includes:
@@ -165,7 +166,7 @@ Example endpoints:
 ## License & Acknowledgements
 
 - Project developed as part of an academic dissertation
-- Voice control powered by [Leon](https://getleon.ai)
+- Voice control powered by [Leon](https://github.com/leon-ai/leon)
 - Built with open-source technologies including Flask, React Native, MongoDB, and scikit-learn
 
 ---
