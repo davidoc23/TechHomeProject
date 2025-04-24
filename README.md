@@ -125,13 +125,20 @@ pip install pytest
 pytest tests/
 ```
 
-
-
-
 Includes:
-- `test_auth.py` – Login and registration
-- `test_devices.py` – Device route testing
-- `conftest.py` – Pytest fixture setup for test client
+- `test_auth_routes.py` – Login and registration
+
+- `test_automation_routes.py` – Automation route testing
+
+- `test_device_routes.py` – Device route testing
+
+- `test_home_assistant_routes.py` – Home Assistant integration testing
+
+- `test_integration_flow.py` – Full integration flow testing
+
+- `test_ml_routes.py` – Machine learning route testing
+
+- `test_room_routes.py` – Room and zone route testing
 
 ---
 
