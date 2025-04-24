@@ -39,8 +39,10 @@ TechHome is a full-stack smart home management system that allows users to contr
   - Backend integration with Leon's intent parser
 
 - **Raspberry Pi Hub**  
-  - Receives HTTP commands from backend  
-  - Sends actions to real or simulated smart devices over local network
+  - Runs Home Assistant as the core local controller  
+  - Receives HTTP commands from the Flask backend  
+  - Sends actions to real or simulated smart devices over the local network  
+  - Acts as a bridge between cloud services and local automation
 
 ---
 
@@ -154,6 +156,7 @@ Includes:
 
 - Python or Node service listening for HTTP commands
 - Receives requests from backend and relays them to smart devices
+- Runs [Home Assistant](https://www.home-assistant.io/) as the local automation engine  
 
 ---
 
@@ -171,9 +174,10 @@ Example endpoints:
 
 ## License & Acknowledgements
 
-- Project developed as part of an academic dissertation
-- Voice control powered by [Leon](https://github.com/leon-ai/leon)
-- Built with open-source technologies including Flask, React Native, MongoDB, and scikit-learn
+- Project developed as part of an academic dissertation  
+- Voice control powered by [Leon](https://github.com/leon-ai/leon)  
+- Local automation powered by [Home Assistant](https://www.home-assistant.io/)  
+- Built with open-source technologies including Flask, React Native, MongoDB, and scikit-learn  
 
 ---
 
