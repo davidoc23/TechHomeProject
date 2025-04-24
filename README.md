@@ -115,7 +115,7 @@ Make sure to configure your `.env` or `config.py` with:
 
 ### Running Tests
 
-Navigate to the `backend/` folder, make sure venv is active and run:
+Navigate to the `backend/` folder, make sure venv is active.
 
 Ensure `pytest` is installed:
 
@@ -123,6 +123,7 @@ Ensure `pytest` is installed:
 pip install pytest
 ```
 
+Then run: 
 ```bash
 pytest tests/
 ```
