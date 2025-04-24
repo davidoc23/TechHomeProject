@@ -137,7 +137,7 @@ Includes:
 
 ### Voice Assistant (Leon)
 
-- Install Leon: [https://getleon.ai/docs/](https://getleon.ai/docs/)
+- Install Leon: [https://github.com/leon-ai/leon](https://github.com/leon-ai/leon)
 - Run on Linux/VM environment (if not working on Windows)
 - Create custom commands to send HTTP requests to backend
 
