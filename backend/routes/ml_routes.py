@@ -50,16 +50,57 @@ def predict_device_state(device_id):
 def get_suggestions():
     """
     Get AI suggestions for devices that should be toggled
+    Can filter by rooms with ?rooms=room_id1,room_id2
     """
     try:
         user_id = get_jwt_identity()
-        suggestions = get_device_suggestions()
+        
+        # Get optional room filter from query params
+        room_filter = request.args.get('rooms', None)
+        room_ids = []
+        
+        if room_filter:
+            try:
+                # Split and convert to ObjectIds
+                room_ids = [ObjectId(room_id) for room_id in room_filter.split(',') if room_id]
+            except Exception as e:
+                print(f"Error parsing room IDs: {e}")
+                # Log but don't fail - continue without room filtering
+                pass
+                
+        # Validate the user has access to these rooms, if specified
+        if room_ids:
+            try:
+                # Check that rooms belong to user
+                valid_rooms = list(db.rooms_collection.find({
+                    "_id": {"$in": room_ids},
+                    "user_id": user_id
+                }))
+                
+                # Only use room IDs that belong to the user
+                room_ids = [room["_id"] for room in valid_rooms]
+            except Exception as e:
+                print(f"Error validating room access: {e}")
+                # Continue without room filtering for safety
+                room_ids = []
+        
+        # Try to get ML-based suggestions
+        suggestions = get_device_suggestions(room_ids if room_ids else None)
 
+        # Fall back to basic suggestions if ML didn't provide any
         if not suggestions:
             suggestions = []
-            devices = list(db.devices_collection.find(limit=3))
+            # Filter devices by room if room_ids provided
+            query = {}
+            if room_ids:
+                query["room_id"] = {"$in": room_ids}
+            
+            # Limit to 3 devices
+            devices = list(db.devices_collection.find(query).limit(3))
+            
             if devices:
                 for device in devices:
+                    # Get last state change for this device
                     last_change = db.device_history_collection.find_one(
                         {"device_id": device["_id"]},
                         sort=[("timestamp", -1)]
@@ -67,9 +108,11 @@ def get_suggestions():
 
                     ts = last_change.get("timestamp") if last_change else None
 
+                    # Make sure timestamp has timezone info
                     if ts and ts.tzinfo is None:
                         ts = ts.replace(tzinfo=timezone.utc)
 
+                    # Only suggest changing devices that haven't changed recently
                     if not ts or not isinstance(ts, datetime) or (datetime.now(timezone.utc) - ts).total_seconds() > 1800:
                         confidence = random.uniform(0.75, 0.95)
                         suggestions.append({
@@ -80,6 +123,7 @@ def get_suggestions():
                             "confidence": round(confidence, 2)
                         })
 
+                        # Limit to 2 suggestions
                         if len(suggestions) >= 2:
                             break
 

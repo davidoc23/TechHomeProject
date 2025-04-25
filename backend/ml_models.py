@@ -199,6 +199,32 @@ def update_device_history(device_id, state, user_id=None):
     except Exception as e:
         print(f"Error training model for device {device_id}: {e}")
 
-def get_device_suggestions():
-    """Get AI suggestions for device states"""
-    return device_predictor.get_device_suggestions()
+def get_device_suggestions(room_ids=None):
+    """
+    Get AI suggestions for device states
+    Optionally filter by room_ids (list of ObjectIds)
+    """
+    try:
+        suggestions = device_predictor.get_device_suggestions()
+        
+        # Filter by room if specified
+        if room_ids and isinstance(room_ids, list) and suggestions:
+            filtered_suggestions = []
+            for s in suggestions:
+                try:
+                    # Check if device exists in the specified rooms
+                    device_exists = db.devices_collection.find_one({
+                        "_id": ObjectId(s["device_id"]), 
+                        "room_id": {"$in": room_ids}
+                    })
+                    if device_exists:
+                        filtered_suggestions.append(s)
+                except Exception as device_error:
+                    print(f"Error filtering device {s.get('device_id')}: {device_error}")
+                    continue
+            return filtered_suggestions
+        
+        return suggestions
+    except Exception as e:
+        print(f"Error getting device suggestions: {e}")
+        return []

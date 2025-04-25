@@ -116,7 +116,21 @@ export function AIDeviceSuggestions() {
             
             // Try to fetch from the API first
             try {
-                const response = await fetch(`${API_URL}/ml/suggestions`, {
+                // Get active rooms and include them as query params
+                let params = '';
+                try {
+                    const userRooms = await AsyncStorage.getItem('userRooms');
+                    if (userRooms) {
+                        const rooms = JSON.parse(userRooms);
+                        if (Array.isArray(rooms) && rooms.length > 0) {
+                            params = `?rooms=${rooms.join(',')}`;
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Error getting user rooms:', err);
+                }
+                
+                const response = await fetch(`${API_URL}/ml/suggestions${params}`, {
                     method: 'GET',
                     headers,
                     timeout: 5000
@@ -126,9 +140,29 @@ export function AIDeviceSuggestions() {
                     // If unauthorized, clear authenticated status
                     if (response.status === 401) {
                         setIsAuthenticated(false);
+                        throw new Error('Authentication required for AI suggestions');
+                    } else if (response.status === 422) {
+                        // Try again without parameters
+                        console.warn('Retrying suggestions without parameters');
+                        const retryResponse = await fetch(`${API_URL}/ml/suggestions`, {
+                            method: 'GET',
+                            headers,
+                            timeout: 5000
+                        });
+                        
+                        if (!retryResponse.ok) {
+                            throw new Error(`Failed to fetch AI suggestions: ${retryResponse.status}`);
+                        }
+                        
+                        const retryData = await retryResponse.json();
+                        setSuggestions(retryData.suggestions || []);
+                        setLastFetchTime(now);
+                        return;
+                    } else {
+                        throw new Error(`Failed to fetch AI suggestions: ${response.status}`);
                     }
-                    throw new Error('Failed to fetch AI suggestions');
                 }
+                
                 
                 const data = await response.json();
                 setSuggestions(data.suggestions || []);
@@ -144,6 +178,14 @@ export function AIDeviceSuggestions() {
                     setSuggestions([]);
                     setLastFetchTime(now);
                     return;
+                }
+                
+                // Check if it was a server error (5xx)
+                if (err.message && err.message.includes('500')) {
+                    setError('Server error. Please try again later.');
+                    setSuggestions([]);
+                    setLastFetchTime(now);
+                    // Still continue to fallback logic for best effort
                 }
                 
                 // Generate mock suggestions from recent device history
