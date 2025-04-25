@@ -8,6 +8,7 @@ import os
 from bson import ObjectId
 from datetime import datetime, timezone
 
+# Add backend path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app import app
 import db
@@ -32,26 +33,32 @@ def auth_headers(client):
     token = login.get_json().get('access_token')
     return {'Authorization': f'Bearer {token}'}
 
+@pytest.fixture(autouse=True)
+def cleanup_mock_ml_data():
+    yield
+    db.devices_collection.delete_many({"name": {"$regex": "^MOCK_"}})
+    db.device_history_collection.delete_many({"device_id": {"$exists": True}})
+    db.prediction_feedback_collection.delete_many({"device_id": {"$exists": True}})
+
 def test_predict_device_invalid_id(client, auth_headers):
     response = client.get('/api/ml/predict/device/000000000000000000000000', headers=auth_headers)
     assert response.status_code in [404, 500]
 
 def test_predict_device_not_enough_data(client, auth_headers):
     device_id = db.devices_collection.insert_one({
-        "name": "Smart Plug",
+        "name": "MOCK_Smart Plug",
         "type": "plug",
         "isOn": False
     }).inserted_id
     response = client.get(f'/api/ml/predict/device/{device_id}', headers=auth_headers)
     assert response.status_code in [404, 200]
-    db.devices_collection.delete_one({"_id": device_id})
 
 def test_get_suggestions(client, auth_headers):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
         device_id = db.devices_collection.insert_one({
-            "name": "Mock Suggestion Device",
+            "name": "MOCK_Suggestion Device",
             "type": "light",
             "isOn": False
         }).inserted_id
@@ -64,7 +71,7 @@ def test_get_suggestions(client, auth_headers):
         response = client.get('/api/ml/suggestions', headers=auth_headers)
 
         if response.status_code != 200:
-            print("⚠️ /api/ml/suggestions failed with:", response.status_code)
+            print("/api/ml/suggestions failed with:", response.status_code)
             print("Response body:", response.get_json())
             pytest.skip("Skipping due to ML readiness failure")
 
@@ -72,12 +79,9 @@ def test_get_suggestions(client, auth_headers):
         assert 'suggestions' in data
         assert 'timestamp' in data
 
-        db.devices_collection.delete_one({"_id": device_id})
-        db.device_history_collection.delete_many({"device_id": device_id})
-
 def test_feedback_valid(client, auth_headers):
     device_id = db.devices_collection.insert_one({
-        "name": "Feedback Fan",
+        "name": "MOCK_Feedback Fan",
         "type": "fan",
         "isOn": False
     }).inserted_id
@@ -87,8 +91,6 @@ def test_feedback_valid(client, auth_headers):
     }
     response = client.post('/api/ml/feedback', json=feedback, headers=auth_headers)
     assert response.status_code == 200
-    db.devices_collection.delete_one({"_id": device_id})
-    db.prediction_feedback_collection.delete_many({"device_id": device_id})
 
 def test_feedback_missing_body(client, auth_headers):
     response = client.post('/api/ml/feedback', json=None, headers=auth_headers)
@@ -100,7 +102,7 @@ def test_feedback_missing_device_id(client, auth_headers):
 
 def test_feedback_rejected(client, auth_headers):
     device_id = db.devices_collection.insert_one({
-        "name": "Rejected Fan",
+        "name": "MOCK_Rejected Fan",
         "type": "fan",
         "isOn": True
     }).inserted_id
@@ -110,5 +112,3 @@ def test_feedback_rejected(client, auth_headers):
     }
     response = client.post('/api/ml/feedback', json=feedback, headers=auth_headers)
     assert response.status_code == 200
-    db.devices_collection.delete_one({"_id": device_id})
-    db.prediction_feedback_collection.delete_many({"device_id": device_id})

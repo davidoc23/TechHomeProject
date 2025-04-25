@@ -29,14 +29,18 @@ def auth_headers(client):
     token = login.get_json().get('access_token')
     return {'Authorization': f'Bearer {token}'}
 
+@pytest.fixture(autouse=True)
+def cleanup_mock_ha_devices():
+    yield
+    db.devices_collection.delete_many({"name": {"$regex": "^MOCK_"}})
+
 @patch('requests.post')
 @patch('requests.get')
 def test_toggle_ha_valid_with_db_device(mock_get, mock_post, client, auth_headers):
     entity_id = "light.test_light"
 
-    # Insert mock HA device into DB
     device_id = db.devices_collection.insert_one({
-        "name": "Test Light",
+        "name": "MOCK_Test Light",
         "type": "light",
         "entityId": entity_id,
         "isHomeAssistant": True,
@@ -51,14 +55,11 @@ def test_toggle_ha_valid_with_db_device(mock_get, mock_post, client, auth_header
     assert data.get("success") is True
     assert data.get("entity_id") == entity_id
 
-    db.devices_collection.delete_one({"_id": device_id})
-
 @patch('requests.post')
 @patch('requests.get')
 def test_toggle_ha_valid_without_db_device(mock_get, mock_post, client, auth_headers):
     entity_id = "light.test_fallback"
 
-    # Simulate response from HA with current state "off"
     mock_get.return_value.status_code = 200
     mock_get.return_value.json.return_value = {"state": "off"}
     mock_post.return_value.status_code = 200
@@ -114,9 +115,8 @@ def test_toggle_ha_invalid_entity_id(client, auth_headers):
 def test_toggle_ha_db_update_failure(mock_update, mock_get, mock_post, client, auth_headers):
     entity_id = "light.db_error"
 
-    # Insert the device into DB to trigger update block
     device_id = db.devices_collection.insert_one({
-        "name": "DB Error Light",
+        "name": "MOCK_DB Error Light",
         "type": "light",
         "entityId": entity_id,
         "isHomeAssistant": True,
@@ -127,23 +127,19 @@ def test_toggle_ha_db_update_failure(mock_update, mock_get, mock_post, client, a
     mock_get.return_value.json.return_value = {"state": "on"}
     mock_post.return_value.status_code = 200
 
-    # Simulate DB failure
     mock_update.side_effect = Exception("Simulated DB failure")
 
     response = client.post(f'/api/home-assistant/toggle/{entity_id}', headers=auth_headers)
     assert response.status_code == 500
     assert "error" in response.get_json()
 
-    db.devices_collection.delete_one({"_id": device_id})
-
 @patch('requests.post')
 @patch('requests.get')
 def test_toggle_ha_flips_device_state(mock_get, mock_post, client, auth_headers):
     entity_id = "light.flip_test"
 
-    # Insert device with isOn=True
     device_id = db.devices_collection.insert_one({
-        "name": "Flip Test Light",
+        "name": "MOCK_Flip Test Light",
         "type": "light",
         "entityId": entity_id,
         "isHomeAssistant": True,
@@ -157,5 +153,3 @@ def test_toggle_ha_flips_device_state(mock_get, mock_post, client, auth_headers)
     data = response.get_json()
     assert data.get("success") is True
     assert data.get("new_state") == "off"
-
-    db.devices_collection.delete_one({"_id": device_id})

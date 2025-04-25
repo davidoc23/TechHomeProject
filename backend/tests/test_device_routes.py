@@ -6,10 +6,10 @@ from unittest.mock import patch
 from dotenv import load_dotenv
 import requests
 
-# Load environment variables from .env file
-load_dotenv() 
+# Load environment variables
+load_dotenv()
 
-# Add backend path to Python path
+# Add backend path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app import app
 import db
@@ -19,10 +19,15 @@ def ensure_dummy_thermostat():
     if not db.devices_collection.find_one({"_id": thermostat_id}):
         db.devices_collection.insert_one({
             "_id": thermostat_id,
-            "name": "Dummy Thermostat",
+            "name": "MOCK_Dummy Thermostat",
             "type": "thermostat",
             "isOn": False
         })
+
+@pytest.fixture(autouse=True)
+def cleanup_mock_devices():
+    yield
+    db.devices_collection.delete_many({"name": {"$regex": "^MOCK_"}})
 
 @pytest.fixture
 def client():
@@ -36,7 +41,7 @@ def test_get_devices(client):
     assert isinstance(response.get_json(), list)
 
 def test_toggle_device_invalid_id(client):
-    invalid_id = "ffffffffffffffffffffffff"  # clearly invalid ID
+    invalid_id = "ffffffffffffffffffffffff"
     response = client.post(f'/api/devices/{invalid_id}/toggle')
     assert response.status_code == 404
 
@@ -54,8 +59,8 @@ def test_toggle_all_lights_valid(client):
     assert isinstance(response.get_json(), list)
 
 def test_set_temperature_missing_value(client):
-    ensure_dummy_thermostat()  
-    dummy_id = "111111111111111111111111"  
+    ensure_dummy_thermostat()
+    dummy_id = "111111111111111111111111"
     response = client.post(f'/api/devices/{dummy_id}/temperature', json={})
     assert response.status_code == 400
     assert response.get_json().get('error') == 'Temperature required'
@@ -65,7 +70,7 @@ def test_toggle_homeassistant_device(mock_post, client):
     device_id = ObjectId()
     db.devices_collection.insert_one({
         "_id": device_id,
-        "name": "Mock HA Light",
+        "name": "MOCK_HA Light",
         "type": "light",
         "isHomeAssistant": True,
         "entityId": "light.mock_ha_light",
@@ -79,17 +84,15 @@ def test_toggle_homeassistant_device(mock_post, client):
     response = client.post(f'/api/devices/{device_id}/toggle')
     assert response.status_code == 200
     data = response.get_json()
-    assert data['name'] == 'Mock HA Light'
+    assert data['name'] == 'MOCK_HA Light'
     assert 'isOn' in data
-
-    db.devices_collection.delete_one({"_id": device_id})
 
 @patch('requests.post')
 def test_toggle_homeassistant_device_failure(mock_post, client):
     device_id = ObjectId()
     db.devices_collection.insert_one({
         "_id": device_id,
-        "name": "Broken HA Light",
+        "name": "MOCK_Broken HA Light",
         "type": "light",
         "isHomeAssistant": True,
         "entityId": "light.broken_ha_light",
@@ -104,13 +107,11 @@ def test_toggle_homeassistant_device_failure(mock_post, client):
     assert response.status_code != 200
     assert 'error' in response.get_json()
 
-    db.devices_collection.delete_one({'_id': device_id})
-
 def test_toggle_real_local_device(client):
     device_id = ObjectId()
     db.devices_collection.insert_one({
         "_id": device_id,
-        "name": "Test Lamp",
+        "name": "MOCK_Test Lamp",
         "type": "light",
         "isHomeAssistant": False,
         "isOn": False
@@ -119,10 +120,8 @@ def test_toggle_real_local_device(client):
     response = client.post(f'/api/devices/{device_id}/toggle')
     assert response.status_code == 200
     data = response.get_json()
-    assert data['name'] == "Test Lamp"
+    assert data['name'] == "MOCK_Test Lamp"
     assert 'isOn' in data
-
-    db.devices_collection.delete_one({'_id': device_id})
 
 @pytest.mark.integration
 def test_real_ha_device_toggle():

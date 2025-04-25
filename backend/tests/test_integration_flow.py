@@ -36,12 +36,20 @@ def auth_headers(client):
     token = login.get_json().get('access_token')
     return {'Authorization': f'Bearer {token}'}
 
+@pytest.fixture(autouse=True)
+def cleanup_mock_integration_data():
+    yield
+    db.devices_collection.delete_many({"name": {"$regex": "^MOCK_"}})
+    db.device_history_collection.delete_many({"device_id": {"$exists": True}})
+    db.prediction_feedback_collection.delete_many({"device_id": {"$exists": True}})
+    db.automations_collection.delete_many({"name": {"$regex": "^Disabled Auto|Test Auto"}})
+
 @patch('requests.post')
 @patch('requests.get')
 def test_create_and_toggle_ha_device(mock_get, mock_post, client, auth_headers):
     entity_id = "light.integration_toggle"
     device_id = db.devices_collection.insert_one({
-        "name": "Integration Test Light",
+        "name": "MOCK_Integration Test Light",
         "type": "light",
         "entityId": entity_id,
         "isHomeAssistant": True,
@@ -57,8 +65,6 @@ def test_create_and_toggle_ha_device(mock_get, mock_post, client, auth_headers):
 
     updated_device = db.devices_collection.find_one({"_id": ObjectId(device_id)})
     assert updated_device["isOn"] is True
-
-    db.devices_collection.delete_one({"_id": device_id})
 
 def test_register_user_create_automation_trigger(client):
     client.post('/api/auth/register', json={
@@ -82,15 +88,12 @@ def test_register_user_create_automation_trigger(client):
     assert response.status_code == 201
 
     automation_id = response.get_json()["id"]
-
     toggle = client.post(f'/api/automations/{automation_id}/toggle', headers=headers)
     assert toggle.status_code == 200
 
-    db.automations_collection.delete_one({"_id": ObjectId(automation_id)})
-
 def test_predict_then_feedback(client, auth_headers):
     device_id = db.devices_collection.insert_one({
-        "name": "ML Device",
+        "name": "MOCK_ML Device",
         "type": "plug",
         "isOn": False
     }).inserted_id
@@ -105,7 +108,7 @@ def test_predict_then_feedback(client, auth_headers):
         suggest = client.get('/api/ml/suggestions', headers=auth_headers)
 
     if suggest.status_code != 200:
-        print("⚠️ /api/ml/suggestions failed in integration test:", suggest.status_code)
+        print("/api/ml/suggestions failed in integration test:", suggest.status_code)
         print("Response:", suggest.get_json())
         pytest.skip("Skipping ML integration due to model failure")
 
@@ -116,10 +119,6 @@ def test_predict_then_feedback(client, auth_headers):
         "accepted": True
     }, headers=auth_headers)
     assert feedback.status_code == 200
-
-    db.devices_collection.delete_one({"_id": device_id})
-    db.device_history_collection.delete_many({"device_id": device_id})
-    db.prediction_feedback_collection.delete_many({"device_id": device_id})
 
 def test_protected_route_without_token(client):
     response = client.get('/api/rooms/')
@@ -146,8 +145,6 @@ def test_toggle_disabled_automation(client, auth_headers):
     response = client.post(f'/api/automations/{automation_id}/toggle', headers=auth_headers)
     assert response.status_code == 200
     assert "enabled" in response.get_json()
-
-    db.automations_collection.delete_one({"_id": inserted.inserted_id})
 
 def test_non_existent_route(client):
     response = client.get('/api/this-route-does-not-exist')
