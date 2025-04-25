@@ -14,8 +14,43 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const [refreshToken, setRefreshToken] = useState(null);
+  const [tokenExpiry, setTokenExpiry] = useState(null); // Track token expiration time
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Function to decode JWT and extract expiration time
+  const decodeToken = (token) => {
+    try {
+      if (!token) return null;
+      
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = atob(base64);
+      const { exp } = JSON.parse(jsonPayload);
+      
+      return exp ? exp * 1000 : null; // Convert to milliseconds
+    } catch (err) {
+      console.error('Error decoding token:', err);
+      return null;
+    }
+  };
+
+  // Function to check if token is expired
+  const isTokenExpired = () => {
+    if (!tokenExpiry) return true;
+    
+    // Add a 30-second buffer to ensure we refresh before actual expiration
+    return Date.now() > (tokenExpiry - 30000);
+  };
+
+  // Function to validate current token
+  const validateToken = async () => {
+    if (!accessToken || isTokenExpired()) {
+      // If no token or token is expired, try to refresh
+      return await refreshAuth();
+    }
+    return true;
+  };
 
   // Function to initialize auth state from storage
   useEffect(() => {
@@ -29,9 +64,18 @@ export const AuthProvider = ({ children }) => {
           setUser(JSON.parse(userData));
           setAccessToken(accessTokenData);
           setRefreshToken(refreshTokenData);
+          
+          // Set token expiry time
+          const expiry = decodeToken(accessTokenData);
+          setTokenExpiry(expiry);
 
           // Set auth header for future requests
           axios.defaults.headers.common['Authorization'] = `Bearer ${accessTokenData}`;
+          
+          // If token is already expired, try refresh immediately
+          if (expiry && Date.now() > expiry) {
+            refreshAuth();
+          }
         }
       } catch (error) {
         console.error('Error loading auth state', error);
@@ -68,6 +112,10 @@ export const AuthProvider = ({ children }) => {
         lastName
       };
 
+      // Set token expiry
+      const expiry = decodeToken(access_token);
+      setTokenExpiry(expiry);
+
       await AsyncStorage.setItem('user', JSON.stringify(userData));
       await AsyncStorage.setItem('accessToken', access_token);
       await AsyncStorage.setItem('refreshToken', refresh_token);
@@ -103,6 +151,10 @@ export const AuthProvider = ({ children }) => {
       });
 
       const { user_id, username: userName, access_token, refresh_token } = response.data;
+
+      // Set token expiry
+      const expiry = decodeToken(access_token);
+      setTokenExpiry(expiry);
 
       // Get user details
       const userDetailResponse = await axios.get(`${API_URL}/auth/me`, {
@@ -166,6 +218,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setAccessToken(null);
       setRefreshToken(null);
+      setTokenExpiry(null);
       console.log("State variables cleared");
       
       // Explicit return to confirm completion
@@ -176,6 +229,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setAccessToken(null);
       setRefreshToken(null);
+      setTokenExpiry(null);
       return false;
     }
   };
@@ -199,6 +253,10 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.post(`${API_URL}/auth/refresh`, {}, config);
       const { access_token } = response.data;
 
+      // Set token expiry
+      const expiry = decodeToken(access_token);
+      setTokenExpiry(expiry);
+
       // Update storage
       await AsyncStorage.setItem('accessToken', access_token);
 
@@ -211,7 +269,7 @@ export const AuthProvider = ({ children }) => {
       return true;
     } catch (error) {
       console.error('Token refresh failed', error);
-      // Don't logout immediately on refresh failure - it might be temporary
+      // If refresh fails due to invalid/expired refresh token, logout
       if (error.response?.status === 401) {
         await logout();
       }
@@ -248,10 +306,50 @@ export const AuthProvider = ({ children }) => {
       }
     );
 
+    // Add request interceptor to check token validity before each request
+    const requestInterceptor = axios.interceptors.request.use(
+      async config => {
+        // Skip auth check for login and refresh requests
+        if (
+          config.url.includes(`${API_URL}/auth/login`) || 
+          config.url.includes(`${API_URL}/auth/refresh`)
+        ) {
+          return config;
+        }
+        
+        // For other requests requiring auth, check token validity
+        if (config.headers.Authorization || config.url.includes('/api/home-assistant/')) {
+          // If token is expired, try to refresh before proceeding
+          if (isTokenExpired() && refreshToken) {
+            try {
+              const refreshed = await refreshAuth();
+              if (!refreshed) {
+                // If refresh failed, force logout
+                await logout();
+                throw new Error('Session expired');
+              }
+              
+              // Update request with new token
+              config.headers.Authorization = `Bearer ${accessToken}`;
+            } catch (error) {
+              console.error('Auth validation error:', error);
+              // Force logout on any auth error
+              await logout();
+              throw error;
+            }
+          }
+        }
+        
+        return config;
+      },
+      error => Promise.reject(error)
+    );
+
     return () => {
       axios.interceptors.response.eject(responseInterceptor);
+      axios.interceptors.request.eject(requestInterceptor);
     };
-  }, [refreshToken, accessToken]);
+  }, [refreshToken, accessToken, tokenExpiry]);
 
   // Update user profile data
   const updateProfile = async (updateData) => {
@@ -328,13 +426,15 @@ export const AuthProvider = ({ children }) => {
         user,
         loading,
         error,
-        isAuthenticated: !!user && !!accessToken,
+        isAuthenticated: !!user && !!accessToken && !isTokenExpired(),
         register,
         login,
         logout,
         updateProfile,
         changePassword,
-        refreshAuth
+        refreshAuth,
+        validateToken,  // Expose this function for direct token validation
+        isTokenExpired  // Expose for components to check token status
       }}
     >
       {children}
