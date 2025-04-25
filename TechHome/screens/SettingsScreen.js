@@ -12,11 +12,25 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationTracking, setLocationTracking] = useState(true);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [networkModalVisible, setNetworkModalVisible] = useState(false);
+  const [securityModalVisible, setSecurityModalVisible] = useState(false);
+  const [aboutModalVisible, setAboutModalVisible] = useState(false);
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [email, setEmail] = useState(user?.email || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  
+  // Network configuration state
+  const [wifiSSID, setWifiSSID] = useState('TechHome_Network');
+  const [wifiPassword, setWifiPassword] = useState('');
+  const [useStaticIP, setUseStaticIP] = useState(false);
+  const [ipAddress, setIpAddress] = useState('192.168.1.100');
+  
+  // Security settings state
+  const [enableTwoFactor, setEnableTwoFactor] = useState(false);
+  const [autoLockTimeout, setAutoLockTimeout] = useState(5);
+  const [requirePinForSensitive, setRequirePinForSensitive] = useState(true);
   
   // Get common theme styles
   const themeStyles = applyThemeToComponents(theme);
@@ -167,6 +181,37 @@ export default function SettingsScreen() {
     }
   };
 
+  // Handle network configuration changes
+  const handleSaveNetworkSettings = () => {
+    // Validate settings
+    if (useStaticIP) {
+      const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+      if (!ipRegex.test(ipAddress)) {
+        Alert.alert('Invalid IP', 'Please enter a valid IP address');
+        return;
+      }
+    }
+
+    // In a real app, we would send these settings to the backend
+    // For now, we'll just show a success message
+    Alert.alert(
+      'Network Settings Updated',
+      `Wi-Fi network ${wifiSSID} configured successfully${useStaticIP ? ` with static IP ${ipAddress}` : ''}.`,
+      [{ text: 'OK', onPress: () => setNetworkModalVisible(false) }]
+    );
+  };
+
+  // Handle security settings changes
+  const handleSaveSecuritySettings = () => {
+    // In a real app, we would send these settings to the backend
+    // For now, we'll just show a success message
+    Alert.alert(
+      'Security Settings Updated',
+      `Your security preferences have been saved.${enableTwoFactor ? ' Two-factor authentication enabled.' : ''}`,
+      [{ text: 'OK', onPress: () => setSecurityModalVisible(false) }]
+    );
+  };
+
   return (
     <ScrollView style={themeStyles.screenContainer}>
       <StatusBar barStyle={theme.statusBar} />
@@ -250,7 +295,10 @@ export default function SettingsScreen() {
       <View style={themeStyles.cardSection}>
         <Text style={[SettingsStyles.sectionTitle, themeStyles.text]}>System Settings</Text>
         
-        <TouchableOpacity style={themeStyles.navigationItem}>
+        <TouchableOpacity 
+          style={themeStyles.navigationItem}
+          onPress={() => setNetworkModalVisible(true)}
+        >
           <View style={SettingsStyles.settingInfo}>
             <Ionicons name="wifi-outline" size={24} color={theme.textSecondary} style={SettingsStyles.settingIcon} />
             <Text style={themeStyles.text}>Network Configuration</Text>
@@ -258,7 +306,10 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
         </TouchableOpacity>
         
-        <TouchableOpacity style={themeStyles.navigationItem}>
+        <TouchableOpacity 
+          style={themeStyles.navigationItem}
+          onPress={() => setSecurityModalVisible(true)}
+        >
           <View style={SettingsStyles.settingInfo}>
             <Ionicons name="shield-checkmark-outline" size={24} color={theme.textSecondary} style={SettingsStyles.settingIcon} />
             <Text style={themeStyles.text}>Security Settings</Text>
@@ -266,7 +317,10 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
         </TouchableOpacity>
         
-        <TouchableOpacity style={themeStyles.navigationItem}>
+        <TouchableOpacity 
+          style={themeStyles.navigationItem}
+          onPress={() => setAboutModalVisible(true)}
+        >
           <View style={SettingsStyles.settingInfo}>
             <Ionicons name="information-circle-outline" size={24} color={theme.textSecondary} style={SettingsStyles.settingIcon} />
             <Text style={themeStyles.text}>About TechHome</Text>
@@ -371,6 +425,208 @@ export default function SettingsScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Network Configuration Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={networkModalVisible}
+        onRequestClose={() => setNetworkModalVisible(false)}
+      >
+        <View style={screenStyles.modalContainer}>
+          <View style={screenStyles.modalContent}>
+            <Text style={screenStyles.modalTitle}>Network Configuration</Text>
+            
+            <Text style={[themeStyles.textSecondary, {marginBottom: 5}]}>Wi-Fi Network Name (SSID)</Text>
+            <TextInput
+              style={screenStyles.input}
+              placeholder="Network Name"
+              placeholderTextColor={theme.textTertiary}
+              value={wifiSSID}
+              onChangeText={setWifiSSID}
+            />
+            
+            <Text style={[themeStyles.textSecondary, {marginBottom: 5}]}>Wi-Fi Password</Text>
+            <TextInput
+              style={screenStyles.input}
+              placeholder="Password"
+              placeholderTextColor={theme.textTertiary}
+              value={wifiPassword}
+              onChangeText={setWifiPassword}
+              secureTextEntry
+            />
+
+            <View style={{flexDirection: 'row', alignItems: 'center', marginVertical: 10}}>
+              <Text style={themeStyles.text}>Use Static IP</Text>
+              <Switch
+                value={useStaticIP}
+                onValueChange={setUseStaticIP}
+                trackColor={{ false: '#767577', true: theme.primary + '80' }}
+                thumbColor={useStaticIP ? theme.primary : theme.border}
+                style={{marginLeft: 'auto'}}
+              />
+            </View>
+            
+            {useStaticIP && (
+              <>
+                <Text style={[themeStyles.textSecondary, {marginBottom: 5}]}>IP Address</Text>
+                <TextInput
+                  style={screenStyles.input}
+                  placeholder="192.168.1.100"
+                  placeholderTextColor={theme.textTertiary}
+                  value={ipAddress}
+                  onChangeText={setIpAddress}
+                  keyboardType="numeric"
+                />
+              </>
+            )}
+            
+            <View style={screenStyles.buttonContainer}>
+              <TouchableOpacity
+                style={[screenStyles.button, screenStyles.cancelButton]}
+                onPress={() => setNetworkModalVisible(false)}
+              >
+                <Text style={[screenStyles.buttonText, screenStyles.cancelButtonText]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[screenStyles.button, screenStyles.saveButton]}
+                onPress={handleSaveNetworkSettings}
+              >
+                <Text style={[screenStyles.buttonText, screenStyles.saveButtonText]}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Security Settings Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={securityModalVisible}
+        onRequestClose={() => setSecurityModalVisible(false)}
+      >
+        <View style={screenStyles.modalContainer}>
+          <View style={screenStyles.modalContent}>
+            <Text style={screenStyles.modalTitle}>Security Settings</Text>
+            
+            <View style={{flexDirection: 'row', alignItems: 'center', marginVertical: 10}}>
+              <View>
+                <Text style={themeStyles.text}>Two-Factor Authentication</Text>
+                <Text style={[themeStyles.textTertiary, {fontSize: 12}]}>
+                  Adds extra security to your account
+                </Text>
+              </View>
+              <Switch
+                value={enableTwoFactor}
+                onValueChange={setEnableTwoFactor}
+                trackColor={{ false: '#767577', true: theme.primary + '80' }}
+                thumbColor={enableTwoFactor ? theme.primary : theme.border}
+                style={{marginLeft: 'auto'}}
+              />
+            </View>
+            
+            <View style={{flexDirection: 'row', alignItems: 'center', marginVertical: 10}}>
+              <View>
+                <Text style={themeStyles.text}>Require PIN for Sensitive Actions</Text>
+                <Text style={[themeStyles.textTertiary, {fontSize: 12}]}>
+                  Verify identity before critical changes
+                </Text>
+              </View>
+              <Switch
+                value={requirePinForSensitive}
+                onValueChange={setRequirePinForSensitive}
+                trackColor={{ false: '#767577', true: theme.primary + '80' }}
+                thumbColor={requirePinForSensitive ? theme.primary : theme.border}
+                style={{marginLeft: 'auto'}}
+              />
+            </View>
+            
+            <Text style={[themeStyles.textSecondary, {marginBottom: 5, marginTop: 10}]}>Auto-Lock Timeout (minutes)</Text>
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', marginVertical: 10}}>
+              {[1, 5, 10, 15, 30].map(value => (
+                <TouchableOpacity 
+                  key={value}
+                  style={{
+                    padding: 10,
+                    backgroundColor: autoLockTimeout === value ? theme.primary : theme.cardBackground,
+                    borderRadius: 5,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    minWidth: 40,
+                    alignItems: 'center'
+                  }}
+                  onPress={() => setAutoLockTimeout(value)}
+                >
+                  <Text style={{
+                    color: autoLockTimeout === value ? 'white' : theme.text
+                  }}>{value}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <View style={screenStyles.buttonContainer}>
+              <TouchableOpacity
+                style={[screenStyles.button, screenStyles.cancelButton]}
+                onPress={() => setSecurityModalVisible(false)}
+              >
+                <Text style={[screenStyles.buttonText, screenStyles.cancelButtonText]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[screenStyles.button, screenStyles.saveButton]}
+                onPress={handleSaveSecuritySettings}
+              >
+                <Text style={[screenStyles.buttonText, screenStyles.saveButtonText]}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* About TechHome Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={aboutModalVisible}
+        onRequestClose={() => setAboutModalVisible(false)}
+      >
+        <View style={screenStyles.modalContainer}>
+          <View style={screenStyles.modalContent}>
+            <Text style={screenStyles.modalTitle}>About TechHome</Text>
+            
+            <View style={{alignItems: 'center', marginVertical: 20}}>
+              <Ionicons name="home" size={60} color={theme.primary} />
+              <Text style={[themeStyles.text, {fontSize: 24, fontWeight: 'bold', marginTop: 10}]}>TechHome</Text>
+              <Text style={themeStyles.textSecondary}>Version 1.0.0</Text>
+            </View>
+            
+            <Text style={[themeStyles.text, {fontWeight: '600', marginTop: 10}]}>Description</Text>
+            <Text style={[themeStyles.textSecondary, {marginVertical: 5}]}>
+              TechHome is a smart home management system that connects your devices,
+              automates your routines, and makes your home more efficient and comfortable.
+            </Text>
+            
+            <Text style={[themeStyles.text, {fontWeight: '600', marginTop: 10}]}>Developers</Text>
+            <Text style={[themeStyles.textSecondary, {marginVertical: 5}]}>
+              Created by the TechHome Team as part of the Advanced Software Development Project.
+            </Text>
+            
+            <Text style={[themeStyles.text, {fontWeight: '600', marginTop: 10}]}>Contact</Text>
+            <Text style={[themeStyles.textSecondary, {marginVertical: 5}]}>
+              support@techhome.example.com
+            </Text>
+            
+            <TouchableOpacity
+              style={[screenStyles.button, screenStyles.saveButton, {marginTop: 20}]}
+              onPress={() => setAboutModalVisible(false)}
+            >
+              <Text style={[screenStyles.buttonText, screenStyles.saveButtonText]}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
