@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Switch, ScrollView, Alert, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, Switch, ScrollView, Alert, StatusBar, TextInput, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -7,10 +7,16 @@ import SettingsStyles from '../styles/SettingsScreenStyle';
 import { applyThemeToComponents } from '../theme/utils';
 
 export default function SettingsScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateProfile } = useAuth();
   const { isDarkMode, toggleDarkMode, theme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationTracking, setLocationTracking] = useState(true);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [firstName, setFirstName] = useState(user?.firstName || '');
+  const [lastName, setLastName] = useState(user?.lastName || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
   
   // Get common theme styles
   const themeStyles = applyThemeToComponents(theme);
@@ -48,6 +54,50 @@ export default function SettingsScreen() {
       fontWeight: 'bold',
       fontSize: 18,
     },
+    // Apply theme colors to modal styles from SettingsStyles
+    modalContainer: {
+      ...SettingsStyles.modalContainer,
+    },
+    modalContent: {
+      ...SettingsStyles.modalContent,
+      backgroundColor: theme.cardBackground,
+    },
+    modalTitle: {
+      ...SettingsStyles.modalTitle,
+      color: theme.text,
+    },
+    input: {
+      ...SettingsStyles.input,
+      borderColor: theme.border,
+      color: theme.text,
+      backgroundColor: theme.inputBackground || '#f9f9f9',
+    },
+    buttonContainer: {
+      ...SettingsStyles.buttonContainer,
+    },
+    button: {
+      ...SettingsStyles.button,
+    },
+    cancelButton: {
+      ...SettingsStyles.cancelButton,
+    },
+    saveButton: {
+      ...SettingsStyles.saveButton,
+      backgroundColor: theme.primary,
+    },
+    buttonText: {
+      ...SettingsStyles.buttonText,
+    },
+    cancelButtonText: {
+      ...SettingsStyles.cancelButtonText,
+      color: theme.text,
+    },
+    saveButtonText: {
+      ...SettingsStyles.saveButtonText,
+    },
+    errorText: {
+      ...SettingsStyles.errorText,
+    },
   };
 
   const handleLogout = async () => {
@@ -78,6 +128,44 @@ export default function SettingsScreen() {
       ]
     );
   };
+  
+  const handleUpdateProfile = async () => {
+    if (isSubmitting) return;
+    
+    // Reset any previous errors
+    setFormError('');
+    
+    // Input validation
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+      setFormError('All fields are required');
+      return;
+    }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setFormError('Please enter a valid email address');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      await updateProfile({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim()
+      });
+      
+      setProfileModalVisible(false);
+      Alert.alert('Success', 'Profile updated successfully');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setFormError(error.message || 'Failed to update profile. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <ScrollView style={themeStyles.screenContainer}>
@@ -92,7 +180,10 @@ export default function SettingsScreen() {
           <Text style={[SettingsStyles.profileEmail, themeStyles.textSecondary]}>{user?.email}</Text>
           <Text style={[SettingsStyles.profileUsername, themeStyles.textTertiary]}>@{user?.username}</Text>
         </View>
-        <TouchableOpacity style={screenStyles.editProfileButton}>
+        <TouchableOpacity 
+          style={screenStyles.editProfileButton}
+          onPress={() => setProfileModalVisible(true)}
+        >
           <Text style={screenStyles.editProfileButtonText}>Edit Profile</Text>
         </TouchableOpacity>
       </View>
@@ -206,6 +297,83 @@ export default function SettingsScreen() {
       <View style={SettingsStyles.versionContainer}>
         <Text style={themeStyles.textTertiary}>TechHome v1.0.0</Text>
       </View>
+      
+      {/* Edit Profile Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={profileModalVisible}
+        onRequestClose={() => setProfileModalVisible(false)}
+      >
+        <View style={screenStyles.modalContainer}>
+          <View style={screenStyles.modalContent}>
+            <Text style={screenStyles.modalTitle}>Edit Profile</Text>
+            
+            {formError ? <Text style={screenStyles.errorText}>{formError}</Text> : null}
+            
+            <TextInput
+              style={screenStyles.input}
+              placeholder="First Name"
+              placeholderTextColor={theme.textTertiary}
+              value={firstName}
+              onChangeText={(text) => {
+                setFirstName(text);
+                setFormError('');
+              }}
+            />
+            
+            <TextInput
+              style={screenStyles.input}
+              placeholder="Last Name"
+              placeholderTextColor={theme.textTertiary}
+              value={lastName}
+              onChangeText={(text) => {
+                setLastName(text);
+                setFormError('');
+              }}
+            />
+            
+            <TextInput
+              style={screenStyles.input}
+              placeholder="Email"
+              placeholderTextColor={theme.textTertiary}
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                setFormError('');
+              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            
+            <View style={screenStyles.buttonContainer}>
+              <TouchableOpacity
+                style={[screenStyles.button, screenStyles.cancelButton]}
+                onPress={() => {
+                  setProfileModalVisible(false);
+                  // Reset form values to current user data
+                  setFirstName(user?.firstName || '');
+                  setLastName(user?.lastName || '');
+                  setEmail(user?.email || '');
+                  setFormError('');
+                }}
+              >
+                <Text style={[screenStyles.buttonText, screenStyles.cancelButtonText]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[screenStyles.button, screenStyles.saveButton, isSubmitting && { opacity: 0.7 }]}
+                onPress={handleUpdateProfile}
+                disabled={isSubmitting}
+              >
+                <Text style={[screenStyles.buttonText, screenStyles.saveButtonText]}>
+                  {isSubmitting ? 'Saving...' : 'Save'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
