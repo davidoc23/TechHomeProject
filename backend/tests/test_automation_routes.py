@@ -169,3 +169,49 @@ def test_duplicate_automation_name(client, auth_headers):
 
     response2 = client.post('/api/automations/', json=automation_data, headers=auth_headers)
     assert response2.status_code in [201, 409]
+
+def test_create_automation_turn_on(client, auth_headers):
+    automation_data = {
+        "name": "MOCK_Turn On Test",
+        "type": "time",
+        "condition": {"type": "time", "value": "12:00"},
+        "action": {
+            "deviceId": "000000000000000000000000",
+            "command": "turn_on"
+        },
+        "enabled": True
+    }
+    response = client.post('/api/automations/', json=automation_data, headers=auth_headers)
+    assert response.status_code == 201
+    data = response.get_json()
+    assert 'id' in data
+
+def test_create_automation_turn_off(client, auth_headers):
+    automation_data = {
+        "name": "MOCK_Turn Off Test",
+        "type": "time",
+        "condition": {"type": "time", "value": "12:00"},
+        "action": {
+            "deviceId": "000000000000000000000000",
+            "command": "turn_off"
+        },
+        "enabled": True
+    }
+    response = client.post('/api/automations/', json=automation_data, headers=auth_headers)
+    assert response.status_code == 201
+    data = response.get_json()
+    assert 'id' in data
+
+def test_create_automation_invalid_command(client, auth_headers):
+    automation_data = {
+        "name": "MOCK_Invalid Command",
+        "type": "time",
+        "condition": {"type": "time", "value": "12:00"},
+        "action": {
+            "deviceId": "000000000000000000000000",
+            "command": "power_up"  # invalid command
+        },
+        "enabled": True
+    }
+    response = client.post('/api/automations/', json=automation_data, headers=auth_headers)
+    assert response.status_code in [201, 400]  
