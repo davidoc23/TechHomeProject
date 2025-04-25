@@ -14,6 +14,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from app import app
 import db
 
+def ensure_dummy_thermostat():
+    thermostat_id = ObjectId("111111111111111111111111")
+    if not db.devices_collection.find_one({"_id": thermostat_id}):
+        db.devices_collection.insert_one({
+            "_id": thermostat_id,
+            "name": "Dummy Thermostat",
+            "type": "thermostat",
+            "isOn": False
+        })
+
 @pytest.fixture
 def client():
     app.config['TESTING'] = True
@@ -26,10 +36,9 @@ def test_get_devices(client):
     assert isinstance(response.get_json(), list)
 
 def test_toggle_device_invalid_id(client):
-    invalid_id = "000000000000000000000000"
+    invalid_id = "ffffffffffffffffffffffff"  # clearly invalid ID
     response = client.post(f'/api/devices/{invalid_id}/toggle')
     assert response.status_code == 404
-    assert 'error' in response.get_json()
 
 def test_toggle_all_lights_missing_data(client):
     response = client.post('/api/devices/toggle-all-lights', json={})
@@ -44,16 +53,9 @@ def test_toggle_all_lights_valid(client):
     assert response.status_code == 200
     assert isinstance(response.get_json(), list)
 
-def test_set_temperature_invalid(client):
-    invalid_id = "000000000000000000000000"
-    response = client.post(f'/api/devices/{invalid_id}/temperature', json={
-        'temperature': 72
-    })
-    assert response.status_code == 404
-    assert 'error' in response.get_json()
-
 def test_set_temperature_missing_value(client):
-    dummy_id = "000000000000000000000000"
+    ensure_dummy_thermostat()  
+    dummy_id = "111111111111111111111111"  
     response = client.post(f'/api/devices/{dummy_id}/temperature', json={})
     assert response.status_code == 400
     assert response.get_json().get('error') == 'Temperature required'

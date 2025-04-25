@@ -39,13 +39,13 @@ def get_homeassistant_state(entity_id):
             ha_data = response.json()
             return ha_data.get("state") == "on"  # Returns True if "on", False otherwise
         else:
-            print(f"⚠️ Warning: Could not fetch state for {entity_id}. HTTP {response.status_code}")
+            print(f" Warning: Could not fetch state for {entity_id}. HTTP {response.status_code}")
             return False
     except requests.exceptions.Timeout:
-        print(f"⚠️ Timeout fetching state for {entity_id}")
+        print(f"Timeout fetching state for {entity_id}")
         return False
     except Exception as e:
-        print(f"❌ Error fetching Home Assistant state: {str(e)}")
+        print(f"Error fetching Home Assistant state: {str(e)}")
         return False
 
 @device_routes.route('/', methods=['GET'])
@@ -153,20 +153,16 @@ def add_device():
 @device_routes.route('/<device_id>/toggle', methods=['POST'])
 def toggle_device(device_id):
     try:
-        # DEBUG - print(f"🔄 Toggling device with ID: {device_id}")
-
-        device = devices_collection.find_one({"_id": ObjectId(device_id)})
+        device_obj_id = ObjectId(device_id)
+        device = devices_collection.find_one({"_id": device_obj_id})
+        
         if not device:
             return jsonify({"error": "Device not found"}), 404
 
-        new_state = not device.get('isOn', False)  # Toggle the state
+        new_state = not device.get('isOn', False)
 
         if device.get('isHomeAssistant'):
-            # Toggle Home Assistant Device
             entity_id = device["entityId"]
-            print(f"🔄 Toggling Home Assistant entity: {entity_id} to {'ON' if new_state else 'OFF'}")
-            
-            # Get the desired service (on/off)
             ha_service = "turn_on" if new_state else "turn_off"
             ha_payload = {"entity_id": entity_id}
             ha_headers = {
@@ -174,47 +170,22 @@ def toggle_device(device_id):
                 "Content-Type": "application/json"
             }
             ha_url = f"{HOME_ASSISTANT_URL}/api/services/light/{ha_service}"
-            
-            # Send the command - with shorter timeout for faster response
-            print(f"📡 Sending {ha_service} command to Home Assistant for {entity_id}")
             ha_response = requests.post(ha_url, json=ha_payload, headers=ha_headers, timeout=2)
 
-            if ha_response.status_code == 401:
-                print(f"❌ ERROR: Unauthorized Home Assistant token for {entity_id}")
-                return jsonify({"error": "Unauthorized - Invalid Home Assistant token"}), 401
-
             if ha_response.status_code != 200:
-                print(f"⚠️ WARNING: Failed to toggle {entity_id}. Response: {ha_response.text}")
-                return jsonify({"error": f"Failed to toggle Home Assistant device: {ha_response.text}"}), ha_response.status_code
-            
-            # Trust the state we requested - this avoids the race condition
-            # where the state check happens before Home Assistant processes the change
-            new_state = True if ha_service == "turn_on" else False
-            print(f"✅ Setting {entity_id} to {new_state} in database")
+                return jsonify({"error": f"Home Assistant error: {ha_response.text}"}), ha_response.status_code
 
-        else:
-            # Handle Non-Home Assistant Devices (Local Devices)
-            print(f"🔹 Toggling local (fake) device {device['name']} to {'ON' if new_state else 'OFF'}")
-
-        # Update MongoDB state
+        # Update the local database
         devices_collection.update_one(
-            {"_id": ObjectId(device_id)},
+            {"_id": device_obj_id},
             {"$set": {"isOn": new_state}}
         )
-        
-        # Record device state change for ML model
-        try:
-            user_id = request.headers.get('X-User-ID')
-            update_device_history(device_id, new_state, user_id)
-        except Exception as e:
-            print(f"Warning: Failed to update device history for ML: {e}")
 
-        # Return full updated device object for frontend
         updated_device = {
-            "id": str(device["_id"]),
+            "id": device_id,
             "name": device["name"],
             "type": device["type"],
-            "roomId": str(device["roomId"]) if "roomId" in device else None,
+            "roomId": str(device.get("roomId")) if device.get("roomId") else None,
             "isOn": new_state,
             "isHomeAssistant": device.get("isHomeAssistant", False),
             "entityId": device.get("entityId", None),
@@ -223,8 +194,9 @@ def toggle_device(device_id):
 
         return jsonify(updated_device), 200
 
+    except InvalidId:
+        return jsonify({"error": "Invalid device ID format"}), 400
     except Exception as e:
-        # DEBUG - print(f"❌ Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
   
 @device_routes.route('/toggle-all-lights', methods=['POST'])
@@ -255,10 +227,10 @@ def toggle_all_lights():
 
                 # DEBUGGING MESSAGES
                 if ha_response.status_code == 401:
-                    print(f"❌ ERROR: Unauthorized Home Assistant token for {device['entityId']}")
+                    print(f"ERROR: Unauthorized Home Assistant token for {device['entityId']}")
                     continue
                 elif ha_response.status_code != 200:
-                    print(f"⚠️ WARNING: Failed to toggle {device['entityId']}. Response: {ha_response.text}")
+                    print(f"WARNING: Failed to toggle {device['entityId']}. Response: {ha_response.text}")
                     continue
 
             # Update MongoDB state
@@ -291,28 +263,39 @@ def toggle_all_lights():
 @device_routes.route('/<device_id>/temperature', methods=['POST'])
 def set_temperature(device_id):
     try:
+        device_obj_id = ObjectId(device_id)
+        device = devices_collection.find_one({"_id": device_obj_id})
+
+        if not device:
+            return jsonify({"error": "Device not found"}), 404
+
+        if device['type'] != 'thermostat':
+            return jsonify({"error": "Not a thermostat"}), 400
+
         data = request.get_json()
         if not data or 'temperature' not in data:
             return jsonify({"error": "Temperature required"}), 400
 
-        device = devices_collection.find_one({"_id": ObjectId(device_id)})
-        if not device:
-            return jsonify({"error": "Device not found"}), 404
-        if device['type'] != 'thermostat':
-            return jsonify({"error": "Not a thermostat"}), 400
-
         devices_collection.update_one(
-            {"_id": ObjectId(device_id)},
+            {"_id": device_obj_id},
             {"$set": {"temperature": data['temperature']}}
         )
-        
-        device['temperature'] = data['temperature']
-        device['id'] = str(device['_id'])
-        del device['_id']
-        
-        return jsonify(device)
+
+        updated_device = {
+            "id": device_id,
+            "name": device["name"],
+            "type": device["type"],
+            "roomId": str(device.get("roomId")) if device.get("roomId") else None,
+            "temperature": data['temperature']
+        }
+
+        return jsonify(updated_device), 200
+
+    except InvalidId:
+        return jsonify({"error": "Invalid device ID format"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
     
 @device_routes.route('/<device_id>', methods=['DELETE'])
 def remove_device(device_id):

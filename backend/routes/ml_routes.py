@@ -11,17 +11,18 @@ ml_routes = Blueprint('ml_routes', __name__)
 @ml_routes.route('/predict/device/<device_id>', methods=['GET'])
 @jwt_required()
 def predict_device_state(device_id):
-    """
-    Predict if a device should be on or off based on usage patterns
-    """
     try:
-        user_id = get_jwt_identity()
-        device = db.devices_collection.find_one({"_id": ObjectId(device_id)})
+        try:
+            device_obj_id = ObjectId(device_id)
+        except InvalidId:
+            return jsonify({"error": "Invalid device ID format"}), 400
+
+        device = db.devices_collection.find_one({"_id": device_obj_id})
         if not device:
             return jsonify({"error": "Device not found"}), 404
 
         prediction = device_predictor.predict_device_state(device_id)
-        if prediction is None:
+        if not prediction or "prediction" not in prediction:
             return jsonify({
                 "error": "Insufficient data to make prediction",
                 "suggestion": "Use the device more to build usage patterns"
@@ -38,8 +39,10 @@ def predict_device_state(device_id):
                 "should_be_on": prediction["prediction"],
                 "confidence": prediction["probability"]
             }
-        })
+        }), 200
+
     except Exception as e:
+        print(f"Error in ML prediction: {e}")
         return jsonify({"error": str(e)}), 500
 
 @ml_routes.route('/suggestions', methods=['GET'])
