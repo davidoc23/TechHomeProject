@@ -22,7 +22,13 @@ def get_rooms():
 @jwt_required()
 def add_room():
     try:
-        data = request.get_json()
+        # Check if JSON content-type is set (but still parse even if not)
+        if not request.is_json:
+            print("⚠️ Warning: Content-Type header is not set to application/json")
+            
+        # Parse JSON with force=True to allow parsing even without proper content-type
+        data = request.get_json(force=True)
+        
         if not data or 'name' not in data:
             return jsonify({"error": "Room name required"}), 400
             
@@ -37,6 +43,7 @@ def add_room():
         
         return jsonify(inserted_room), 201
     except Exception as e:
+        print(f"❌ Error adding room: {str(e)}")
         return jsonify({"error": str(e)}), 500
     
 
@@ -44,7 +51,13 @@ def add_room():
 @jwt_required()
 def update_room(room_id):
     try:
-        data = request.get_json()
+        # Check if JSON content-type is set (but still parse even if not)
+        if not request.is_json:
+            print("⚠️ Warning: Content-Type header is not set to application/json")
+            
+        # Parse JSON with force=True to allow parsing even without proper content-type
+        data = request.get_json(force=True)
+        
         if not data or 'name' not in data:
             return jsonify({"error": "Room name required"}), 400
 
@@ -62,6 +75,7 @@ def update_room(room_id):
         return jsonify(updated_room)
 
     except Exception as e:
+        print(f"❌ Error updating room: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @room_routes.route('/<room_id>', methods=['DELETE'])
@@ -78,6 +92,7 @@ def delete_room(room_id):
             return jsonify({"message": "Room deleted successfully"}), 200
         return jsonify({"error": "Room not found"}), 404
     except Exception as e:
+        print(f"❌ Error deleting room: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @room_routes.route('/<room_id>/devices', methods=['GET'])
