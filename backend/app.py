@@ -10,6 +10,7 @@ from routes.home_assistant_routes import home_assistant_routes
 from routes.auth_routes import auth_routes
 from routes.ml_routes import ml_routes
 import db
+from scheduler import start_scheduler, schedule_automations
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
@@ -347,6 +348,15 @@ app.register_blueprint(automation_routes, url_prefix='/api/automations')
 app.register_blueprint(home_assistant_routes, url_prefix='/api/home-assistant')
 app.register_blueprint(ml_routes, url_prefix='/api/ml')
 
+# Refresh scheduled automations after any request
+@app.after_request
+def refresh_scheduler(response):
+    try:
+        schedule_automations()
+    except Exception as e:
+        print(f"Error refreshing scheduler: {e}")
+    return response
+
 # Initialize admin user if needed
 #@app.before_first_request
 def initialize_admin():
@@ -369,4 +379,6 @@ def initialize_admin():
             print(f"Admin initialization failed: {str(e)}")
 
 if __name__ == '__main__':
+    start_scheduler()
+    schedule_automations()
     app.run(host='0.0.0.0', port=5000, debug=True)

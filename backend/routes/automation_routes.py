@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 from db import automations_collection, devices_collection, find_user_by_id
+from scheduler import schedule_automations
 
 automation_routes = Blueprint('automations', __name__)
 
@@ -46,12 +47,17 @@ def create_automation():
         }
 
         result = automations_collection.insert_one(new_automation)
+
+        # Reschedule automations after updating
+        schedule_automations()
+
         new_automation['id'] = str(result.inserted_id)
         del new_automation['_id']
 
         return jsonify(new_automation), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @automation_routes.route('/<automation_id>', methods=['PUT'])
 @jwt_required()
@@ -73,6 +79,9 @@ def update_automation(automation_id):
         )
 
         if result.modified_count:
+            # Reschedule automations after updating
+            schedule_automations()
+
             automation = automations_collection.find_one({"_id": ObjectId(automation_id)})
             automation['id'] = str(automation['_id'])
             del automation['_id']
@@ -81,16 +90,21 @@ def update_automation(automation_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @automation_routes.route('/<automation_id>', methods=['DELETE'])
 @jwt_required()
 def delete_automation(automation_id):
     try:
         result = automations_collection.delete_one({"_id": ObjectId(automation_id)})
         if result.deleted_count:
+            # Reschedule automations after deleting
+            schedule_automations()
+
             return jsonify({"message": "Automation deleted successfully"}), 200
         return jsonify({"error": "Automation not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @automation_routes.route('/<automation_id>/toggle', methods=['POST'])
 @jwt_required()
