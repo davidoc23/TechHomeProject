@@ -6,7 +6,6 @@ const ROOMS_API_URL = 'http://localhost:5000/api/rooms';
 const AUTOMATIONS_API_URL = 'http://localhost:5000/api/automations';
 const DEVICES_API_URL = 'http://localhost:5000/api/devices';
 
-
 /**
  * Hook for managing device operations
  * Implements device-specific logic while using DeviceContext for state management
@@ -31,6 +30,100 @@ export function useDevices() {
     } = useDeviceContext();
 
     /**
+     * Get the authentication token
+     * @returns {Promise<string|null>} Authentication token or null if not found
+     */
+    const getAuthToken = async () => {
+        try {
+            // Check multiple token storage locations
+            const token = 
+                await AsyncStorage.getItem('userToken') || 
+                localStorage?.getItem('accessToken') || 
+                sessionStorage?.getItem('accessToken');
+            
+            if (!token) {
+                console.warn('No authentication token found');
+                setError('Authentication required');
+                return null;
+            }
+            
+            return token;
+        } catch (err) {
+            console.error('Error retrieving auth token:', err);
+            setError('Authentication error');
+            return null;
+        }
+    };
+
+    /**
+     * Makes an API call with proper error handling
+     * @param {string} url - API endpoint
+     * @param {Object} options - Fetch options
+     * @param {boolean} requiresAuth - Whether authentication is required
+     * @returns {Promise<Object|null>} Response data or null on error
+     */
+    const makeApiCall = async (url, options = {}, requiresAuth = true) => {
+        try {
+            const fetchOptions = { ...options };
+            
+            // Add authentication token if required
+            if (requiresAuth) {
+                const token = await getAuthToken();
+                if (!token) return null;
+                
+                fetchOptions.headers = {
+                    ...fetchOptions.headers,
+                    'Authorization': `Bearer ${token}`
+                };
+            }
+            
+            // Add timeout with AbortController
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            
+            fetchOptions.signal = controller.signal;
+            
+            // Make the API call
+            const response = await fetch(url, fetchOptions);
+            clearTimeout(timeoutId);
+            
+            // Parse JSON response
+            let data;
+            if (response.status !== 204) { // 204 No Content
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    console.warn('Could not parse response as JSON:', e);
+                    data = null;
+                }
+            }
+            
+            // Handle response
+            if (response.ok) {
+                return data;
+            } else {
+                if (response.status === 401) {
+                    console.warn('Authentication error');
+                    setError('Authentication error - please log in again');
+                } else {
+                    console.warn(`API error (${response.status}):`, data);
+                    setError(data?.error || `Error: ${response.status}`);
+                }
+                return null;
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                console.error('API request timed out');
+                setError('Request timed out');
+            } else {
+                console.error('API request error:', err);
+                setError(err.message || 'API request failed');
+            }
+            return null;
+        }
+    };
+
+    /**
      * Toggles a device's state
      * @param {string} id - Device ID
     */
@@ -46,24 +139,14 @@ export function useDevices() {
         
         // For Home Assistant devices
         const isHomeAssistant = device.isHomeAssistant;
-        const expectedNewState = !device.isOn;
         
         try {
-            // Make the API call with a faster timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-            
-            const response = await fetch(`${DEVICES_API_URL}/${id}/toggle`, {
+            const updatedDevice = await makeApiCall(`${DEVICES_API_URL}/${id}/toggle`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                signal: controller.signal
-            });
+                headers: { 'Content-Type': 'application/json' }
+            }, false); // Devices don't require authentication in your current implementation
             
-            clearTimeout(timeoutId);
-    
-            if (response.ok) {
-                const updatedDevice = await response.json();
-                
+            if (updatedDevice) {
                 // Apply the update from the server immediately
                 updateDevice(id, { isOn: updatedDevice.isOn });
                 
@@ -99,19 +182,11 @@ export function useDevices() {
                 }
                 
                 return updatedDevice;
-            } else {
-                const errorData = await response.json();
-                setError(errorData.error || 'Failed to toggle device');
-                throw new Error(errorData.error || 'Failed to toggle device');
             }
+            throw new Error('Failed to toggle device');
         } catch (err) {
-            if (err.name === 'AbortError') {
-                console.error('Toggle request timed out');
-                setError('Request timed out');
-            } else {
-                console.error('Network error toggling device:', err);
-                setError('Failed to toggle device');
-            }
+            console.error('Error toggling device:', err);
+            setError('Failed to toggle device');
             throw err;
         }
     };
@@ -121,19 +196,16 @@ export function useDevices() {
      * @param {boolean} desiredState - Target state for all lights
     */
     const toggleAllLights = async (desiredState) => {
-        // DEBUG - console.log(`🔄 Toggling all lights to ${desiredState ? 'ON' : 'OFF'}`);
+        console.log(`Toggling all lights to ${desiredState ? 'ON' : 'OFF'}`);
     
         try {
-            const response = await fetch(`${DEVICES_API_URL}/toggle-all-lights`, {
+            const updatedLights = await makeApiCall(`${DEVICES_API_URL}/toggle-all-lights`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ desiredState })
-            });
-    
-            if (response.ok) {
-                const updatedLights = await response.json();
-                //DEBUG - console.log(`✅ Lights toggled successfully:`, updatedLights);
-    
+            }, false); // Devices don't require authentication in your current implementation
+            
+            if (updatedLights) {
                 // Update only light devices in state
                 setDevices(prevDevices =>
                     prevDevices.map(device =>
@@ -167,13 +239,11 @@ export function useDevices() {
                 } catch (storageErr) {
                     console.warn('Failed to update recent devices:', storageErr);
                 }
-            } else {
-                const errorData = await response.json();
-                // DEBUG - console.error(`❌ Error toggling all lights: ${errorData.error}`);
-                setError(errorData.error || 'Failed to toggle all lights');
+                
+                return updatedLights;
             }
         } catch (err) {
-            // DEBUG - console.error('❌ Network error:', err);
+            console.error('Error toggling all lights:', err);
             setError('Failed to toggle all lights');
         }
     };
@@ -185,14 +255,13 @@ export function useDevices() {
     */
     const setTemperature = async (id, newTemp) => {
         try {
-            const response = await fetch(`${DEVICES_API_URL}/${id}/temperature`, {
+            const updatedDevice = await makeApiCall(`${DEVICES_API_URL}/${id}/temperature`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ temperature: newTemp })
-            });
+            }, false); // Devices don't require authentication in your current implementation
             
-            if (response.ok) {
-                const updatedDevice = await response.json();
+            if (updatedDevice) {
                 setDevices(prev => prev.map(device => 
                     device.id === id ? updatedDevice : device
                 ));
@@ -210,8 +279,11 @@ export function useDevices() {
                 } catch (storageErr) {
                     console.warn('Failed to update recent devices:', storageErr);
                 }
+                
+                return updatedDevice;
             }
         } catch (err) {
+            console.error('Error setting temperature:', err);
             setError('Failed to set temperature');
         }
     };
@@ -220,10 +292,9 @@ export function useDevices() {
      * Adds a new device
      * @param {Object} deviceData - Device information including name, type, and roomId
     */
-
-      const addDevice = async (deviceData) => {
+    const addDevice = async (deviceData) => {
         try {
-            const response = await fetch(DEVICES_API_URL, {
+            const newDevice = await makeApiCall(DEVICES_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -234,16 +305,15 @@ export function useDevices() {
                     entityId: deviceData.entityId || null,
                     attributes: deviceData.attributes || {}
                 })
-            });
+            }, false); // Devices don't require authentication in your current implementation
             
-            if (response.ok) {
+            if (newDevice) {
                 await fetchDevices();
                 addActivity(deviceData.name, 'added to system');
-            } else {
-                const errorData = await response.json();
-                setError(errorData.error || 'Failed to add device');
+                return newDevice;
             }
         } catch (err) {
+            console.error('Error adding device:', err);
             setError('Failed to add device');
         }
     };
@@ -254,12 +324,13 @@ export function useDevices() {
     */
     const removeDevice = async (id) => {
         try {
-            const response = await fetch(`${DEVICES_API_URL}/${id}`, {
-                method: 'DELETE'
-            });
+            const device = devices.find(d => d.id === id);
             
-            if (response.ok) {
-                const device = devices.find(d => d.id === id);
+            const result = await makeApiCall(`${DEVICES_API_URL}/${id}`, {
+                method: 'DELETE'
+            }, false); // Devices don't require authentication in your current implementation
+            
+            if (result) {
                 await fetchDevices();
                 if (device) {
                     addActivity(device.name, 'removed from system');
@@ -276,8 +347,11 @@ export function useDevices() {
                 } catch (storageErr) {
                     console.warn('Failed to update recent devices:', storageErr);
                 }
+                
+                return true;
             }
         } catch (err) {
+            console.error('Error removing device:', err);
             setError('Failed to remove device');
         }
     };
@@ -296,109 +370,155 @@ export function useDevices() {
         }
     };
 
+    /**
+     * Adds a new room
+     * @param {Object} roomData - Room data including name
+     */
     const addRoom = async (roomData) => {
         try {
-            const response = await fetch(ROOMS_API_URL, {
+            const newRoom = await makeApiCall(ROOMS_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(roomData)
-            });
+            }, true); // Requires authentication
             
-            if (response.ok) {
+            if (newRoom) {
+                console.log('Room added successfully:', newRoom);
                 await fetchRooms();
+                addActivity('Room', `Added "${newRoom.name}"`);
+                return newRoom;
             }
         } catch (err) {
+            console.error('Error adding room:', err);
             setError('Failed to add room');
         }
     };
-
+    
+    /**
+     * Removes a room
+     * @param {string} id - Room ID
+     */
     const removeRoom = async (id) => {
         try {
-            const response = await fetch(`${ROOMS_API_URL}/${id}`, {
-                method: 'DELETE'
-            });
+            const room = rooms.find(r => r.id === id);
             
-            if (response.ok) {
+            const result = await makeApiCall(`${ROOMS_API_URL}/${id}`, {
+                method: 'DELETE'
+            }, true); // Requires authentication
+            
+            if (result) {
                 await fetchRooms();
+                if (room) {
+                    addActivity('Room', `Removed "${room.name}"`);
+                }
+                return true;
             }
         } catch (err) {
+            console.error('Error removing room:', err);
             setError('Failed to remove room');
         }
     };
-
+    
+    /**
+     * Edits a room
+     * @param {string} id - Room ID
+     * @param {Object} roomData - Updated room data
+     */
     const editRoom = async (id, roomData) => {
         try {
-            const response = await fetch(`${ROOMS_API_URL}/${id}`, {
+            const updatedRoom = await makeApiCall(`${ROOMS_API_URL}/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(roomData)
-            });
+            }, true); // Requires authentication
             
-            if (response.ok) {
+            if (updatedRoom) {
+                console.log('Room updated successfully:', updatedRoom);
                 await fetchRooms();
+                addActivity('Room', `Updated "${updatedRoom.name}"`);
+                return updatedRoom;
             }
         } catch (err) {
+            console.error('Error editing room:', err);
             setError('Failed to edit room');
         }
     };
-
+    
+    /**
+     * Adds a new automation
+     * @param {Object} automationData - Automation data
+     */
     const addAutomation = async (automationData) => {
         try {
-            const response = await fetch(AUTOMATIONS_API_URL, {
+            const newAutomation = await makeApiCall(AUTOMATIONS_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(automationData)
-            });
+            }, true); // Requires authentication
             
-            if (response.ok) {
+            if (newAutomation) {
                 await fetchAutomations();
                 addActivity('Automation', `Added "${automationData.name}"`);
+                return newAutomation;
             }
         } catch (err) {
+            console.error('Error adding automation:', err);
             setError('Failed to add automation');
         }
     };
 
+    /**
+     * Removes an automation
+     * @param {string} id - Automation ID
+     */
     const removeAutomation = async (id) => {
         try {
-            const response = await fetch(`${AUTOMATIONS_API_URL}/${id}`, {
-                method: 'DELETE'
-            });
+            const automation = automations.find(a => a.id === id);
             
-            if (response.ok) {
-                const automation = automations.find(a => a.id === id);
+            const result = await makeApiCall(`${AUTOMATIONS_API_URL}/${id}`, {
+                method: 'DELETE'
+            }, true); // Requires authentication
+            
+            if (result) {
                 await fetchAutomations();
                 if (automation) {
                     addActivity('Automation', `Removed "${automation.name}"`);
                 }
+                return true;
             }
         } catch (err) {
+            console.error('Error removing automation:', err);
             setError('Failed to remove automation');
         }
     };
 
+    /**
+     * Toggles an automation
+     * @param {string} id - Automation ID
+     */
     const toggleAutomation = async (id) => {
         try {
-            const response = await fetch(`${AUTOMATIONS_API_URL}/${id}/toggle`, {
+            const automation = automations.find(a => a.id === id);
+            
+            const updatedAutomation = await makeApiCall(`${AUTOMATIONS_API_URL}/${id}/toggle`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
-            });
+            }, true); // Requires authentication
             
-            if (response.ok) {
+            if (updatedAutomation) {
                 await fetchAutomations();
-                const automation = automations.find(a => a.id === id);
                 if (automation) {
-                    addActivity(
-                        'Automation',
-                        `${automation.name} ${automation.enabled ? 'disabled' : 'enabled'}`
-                    );
+                    addActivity('Automation', `${automation.name} ${automation.enabled ? 'disabled' : 'enabled'}`);
                 }
+                return updatedAutomation;
             }
         } catch (err) {
+            console.error('Error toggling automation:', err);
             setError('Failed to toggle automation');
         }
     };
 
+    // Return all functions and state
     return { 
         devices, 
         rooms,
