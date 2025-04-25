@@ -83,8 +83,8 @@ export default function SettingsScreen() {
     input: {
       ...SettingsStyles.input,
       borderColor: theme.border,
-      color: theme.text,
-      backgroundColor: theme.inputBackground || '#f9f9f9',
+      color: isDarkMode ? '#FFFFFF' : '#000000', // Ensure visible text in both modes
+      backgroundColor: isDarkMode ? theme.cardBackground : '#f9f9f9',
     },
     buttonContainer: {
       ...SettingsStyles.buttonContainer,
@@ -368,7 +368,7 @@ export default function SettingsScreen() {
             <TextInput
               style={screenStyles.input}
               placeholder="First Name"
-              placeholderTextColor={theme.textTertiary}
+              placeholderTextColor={isDarkMode ? '#999999' : theme.textTertiary}
               value={firstName}
               onChangeText={(text) => {
                 setFirstName(text);
@@ -379,7 +379,7 @@ export default function SettingsScreen() {
             <TextInput
               style={screenStyles.input}
               placeholder="Last Name"
-              placeholderTextColor={theme.textTertiary}
+              placeholderTextColor={isDarkMode ? '#999999' : theme.textTertiary}
               value={lastName}
               onChangeText={(text) => {
                 setLastName(text);
@@ -390,7 +390,7 @@ export default function SettingsScreen() {
             <TextInput
               style={screenStyles.input}
               placeholder="Email"
-              placeholderTextColor={theme.textTertiary}
+              placeholderTextColor={isDarkMode ? '#999999' : theme.textTertiary}
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
@@ -444,7 +444,7 @@ export default function SettingsScreen() {
             <TextInput
               style={screenStyles.input}
               placeholder="Network Name"
-              placeholderTextColor={theme.textTertiary}
+              placeholderTextColor={isDarkMode ? '#999999' : theme.textTertiary}
               value={wifiSSID}
               onChangeText={setWifiSSID}
             />
@@ -453,7 +453,7 @@ export default function SettingsScreen() {
             <TextInput
               style={screenStyles.input}
               placeholder="Password"
-              placeholderTextColor={theme.textTertiary}
+              placeholderTextColor={isDarkMode ? '#999999' : theme.textTertiary}
               value={wifiPassword}
               onChangeText={setWifiPassword}
               secureTextEntry
@@ -476,7 +476,7 @@ export default function SettingsScreen() {
                 <TextInput
                   style={screenStyles.input}
                   placeholder="192.168.1.100"
-                  placeholderTextColor={theme.textTertiary}
+                  placeholderTextColor={isDarkMode ? '#999999' : theme.textTertiary}
                   value={ipAddress}
                   onChangeText={setIpAddress}
                   keyboardType="numeric"

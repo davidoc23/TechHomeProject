@@ -205,11 +205,18 @@ export const LeonVoiceAssistant = ({ visible, onClose }) => {
                 </Text>
               </View>
 
-              <View style={[voiceAssistantStyles.responseContainer, { backgroundColor: theme.isDarkMode ? theme.cardBackground : '#f8f8f8' }]}>
+              <View style={[voiceAssistantStyles.responseContainer, { 
+                backgroundColor: theme.isDarkMode ? theme.cardBackground : '#f8f8f8',
+                borderWidth: theme.isDarkMode ? 1 : 0,
+                borderColor: theme.isDarkMode ? theme.border : 'transparent' 
+              }]}>
                 {isProcessing ? (
-                  <View style={voiceAssistantStyles.processingContainer}>
-                    <ActivityIndicator size="small" color="#007AFF" />
-                    <Text style={voiceAssistantStyles.processingText}>Processing command...</Text>
+                  <View style={[
+                    voiceAssistantStyles.processingContainer,
+                    { backgroundColor: theme.isDarkMode ? 'rgba(0, 122, 255, 0.2)' : 'rgba(0, 122, 255, 0.1)' }
+                  ]}>
+                    <ActivityIndicator size="small" color={theme.primary} />
+                    <Text style={[voiceAssistantStyles.processingText, { color: theme.primary }]}>Processing command...</Text>
                   </View>
                 ) : lastCommand ? (
                   <>
@@ -218,13 +225,16 @@ export const LeonVoiceAssistant = ({ visible, onClose }) => {
 
                     {/* Show recent device updates */}
                     {deviceUpdates.length > 0 && (
-                      <View style={voiceAssistantStyles.deviceUpdateContainer}>
+                      <View style={[
+                        voiceAssistantStyles.deviceUpdateContainer,
+                        { borderTopColor: theme.isDarkMode ? theme.border : '#ddd' }
+                      ]}>
                         {deviceUpdates.map((device, index) => (
                           <Text key={`${device.id}-${index}-${device.isOn ? 'on' : 'off'}`} style={[voiceAssistantStyles.deviceUpdateText, { color: theme.text }]}>
                             <Ionicons
                               name={device.type === 'light' ? 'bulb' : 'thermometer'}
                               size={16}
-                              color={device.isOn ? "#007AFF" : "#666"}
+                              color={device.isOn ? theme.primary : (theme.isDarkMode ? "#999" : "#666")}
                             /> {device.name} is now {device.isOn ? "on" : "off"}
                           </Text>
                         ))}
@@ -240,11 +250,19 @@ export const LeonVoiceAssistant = ({ visible, onClose }) => {
 
               <View style={voiceAssistantStyles.inputContainer}>
                 <TextInput
-                  style={[voiceAssistantStyles.input, { backgroundColor: theme.isDarkMode ? theme.border : '#f0f0f0', color: theme.text }]}
+                  style={[
+                    voiceAssistantStyles.input, 
+                    { 
+                      backgroundColor: theme.isDarkMode ? theme.cardBackground : '#f0f0f0', 
+                      color: theme.isDarkMode ? '#FFFFFF' : '#000000',
+                      borderWidth: theme.isDarkMode ? 1 : 0,
+                      borderColor: theme.isDarkMode ? theme.border : 'transparent'
+                    }
+                  ]}
                   value={commandInput}
                   onChangeText={setCommandInput}
                   placeholder="Or type a command..."
-                  placeholderTextColor={theme.textTertiary}
+                  placeholderTextColor={theme.isDarkMode ? '#999999' : theme.textTertiary}
                   onSubmitEditing={handleSubmit}
                 />
                 <TouchableOpacity onPress={handleSubmit} style={[voiceAssistantStyles.sendButton, { backgroundColor: theme.primary }]}>
