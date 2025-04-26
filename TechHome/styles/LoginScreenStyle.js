@@ -3,9 +3,10 @@ import { StyleSheet } from 'react-native';
 const LoginStyles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     padding: 20,
+    position: 'relative',
+    backgroundColor: 'transparent',
   },
   logoContainer: {
     alignItems: 'center',
@@ -17,42 +18,55 @@ const LoginStyles = StyleSheet.create({
     resizeMode: 'contain',
   },
   logoText: {
-    fontSize: 36,
+    fontSize: 42,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#ffffff',
     marginTop: 10,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 5,
   },
   tagline: {
-    fontSize: 16,
-    color: '#555',
+    fontSize: 18,
+    color: '#ffffff', // Already white
     marginTop: 5,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 5,
+    fontWeight: '500',
   },
   formContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)', // Extremely transparent (10%)
     padding: 20,
     borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: 'transparent', // Removed shadow
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0, // Removed elevation
+    position: 'relative',
+    zIndex: 2, // Ensure form appears on top of the background
+    borderWidth: 0,
   },
   formTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
-    color: '#333',
+    color: '#FFFFFF', // White text for contrast against the blue background
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   inputGroup: {
     flexDirection: 'row',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 8,
     paddingHorizontal: 10,
     marginBottom: 15,
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)', // Extremely transparent (15%)
   },
   inputIcon: {
     marginRight: 10,
@@ -61,16 +75,20 @@ const LoginStyles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
+    backgroundColor: 'transparent', // Completely transparent
+    color: '#FFFFFF', // White text for contrast against the blue background
   },
   visibilityIcon: {
     padding: 10,
   },
   submitButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: 'rgba(0, 122, 255, 0.6)', // More transparent (60%)
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)', // Subtle border
   },
   submitButtonText: {
     color: '#fff',
@@ -100,10 +118,12 @@ const LoginStyles = StyleSheet.create({
     fontWeight: 'bold',
   },
   errorContainer: {
-    backgroundColor: '#ffebee',
+    backgroundColor: 'rgba(255, 235, 238, 0.7)', // Semi-transparent light red
     padding: 10,
     borderRadius: 5,
     marginBottom: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(211, 47, 47, 0.3)', // Subtle red border
   },
   errorText: {
     color: '#d32f2f',

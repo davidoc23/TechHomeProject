@@ -1,9 +1,29 @@
 from pymongo import MongoClient
+from pymongo.errors import ServerSelectionTimeoutError
 from config import MONGO_URI, DATABASE_NAME
 from datetime import datetime, timezone
 
-client = MongoClient(MONGO_URI)
-db = client[DATABASE_NAME]
+# Add local MongoDB URI
+LOCAL_URI = 'mongodb://localhost:27017'
+
+def get_database_connection():
+    """Try Atlas first, fall back to local if needed"""
+    try:
+        # Try to connect to Atlas with a short timeout
+        atlas_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        # Test the connection
+        atlas_client.admin.command('ping')
+        print("Connected to MongoDB Atlas")
+        return atlas_client[DATABASE_NAME]
+    except ServerSelectionTimeoutError:
+        print("Could not connect to MongoDB Atlas, falling back to local MongoDB")
+        # Try local connection
+        local_client = MongoClient(LOCAL_URI)
+        print("Connected to local MongoDB")
+        return local_client[DATABASE_NAME]
+
+# Get database connection
+db = get_database_connection()
 
 #Collections
 devices_collection = db['devices']
@@ -14,17 +34,24 @@ refresh_tokens_collection = db['refresh_tokens']
 device_history_collection = db['device_history']
 prediction_feedback_collection = db['prediction_feedback']
 
-# Create indexes for users collection
-users_collection.create_index("email", unique=True)
-users_collection.create_index("username", unique=True)
+# Create indexes with error handling
+try:
+    # Create indexes for users collection
+    users_collection.create_index("email", unique=True)
+    users_collection.create_index("username", unique=True)
 
-# Create index for refresh tokens collection
-refresh_tokens_collection.create_index("user_id")
-refresh_tokens_collection.create_index("token", unique=True)
-refresh_tokens_collection.create_index("expires_at")
-
+    # Create index for refresh tokens collection
+    refresh_tokens_collection.create_index("user_id")
+    refresh_tokens_collection.create_index("token", unique=True)
+    refresh_tokens_collection.create_index("expires_at")
+    
+    print("Successfully created all indexes")
+except Exception as e:
+    print(f"Warning: Could not create one or more indexes: {e}")
 
 try:
+    # Test connection is still working
+    client = MongoClient(db.client.address[0], db.client.address[1])
     client.admin.command('ping')
     print("Successfully connected to MongoDB")
 except Exception as e:
