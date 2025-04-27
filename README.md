@@ -68,13 +68,16 @@ TechHome/
 │   ├── config.py
 │   ├── db.py
 │   ├── ml_models.py
+|   ├── scheduler.py
 │   ├── routes/
 │   ├── tests/
 │   └── requirements.txt
 ├── TechHome/ (React Native App)
 │   ├── App.js
+│   ├── Config.js
 │   ├── components/
 │   ├── screens/
+|   ├── styles/ 
 │   ├── context/
 │   ├── hooks/
 │   └── theme/
