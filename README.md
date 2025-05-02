@@ -156,7 +156,7 @@ Includes:
 
 ---
 
-### Raspberry Pi (Optional)
+### Raspberry Pi 
 
 - Python or Node service listening for HTTP commands
 - Receives requests from backend and relays them to smart devices
