@@ -4,7 +4,7 @@ TechHome is a full-stack smart home management system that allows users to contr
 
 ---
 > **Note:**  
-> For a detailed summary of [David]’s individual contributions to this project, please see [`README_davod_contributions.md`](./README_david_contribution.md) in the project root.
+> For a detailed summary of [David]’s individual contributions to this project, please see [`README_david_contributions.md`](./README_david_contribution.md) in the project root.
 
 ## Features
 
