@@ -3,6 +3,8 @@
 TechHome is a full-stack smart home management system that allows users to control smart devices through a mobile app, voice assistant, and intelligent automation. It features device control, room management, automation rules, AI-based usage suggestions, and secure user authentication — all built with modular, scalable architecture.
 
 ---
+> **Note:**  
+> For a detailed summary of [David]’s individual contributions to this project, please see [`README_davod_contributions.md`](./README_david_contribution.md) in the project root.
 
 ## Features
 
