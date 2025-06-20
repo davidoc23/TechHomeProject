@@ -75,6 +75,7 @@ export function useDevices() {
                     ...fetchOptions.headers,
                     'Authorization': `Bearer ${token}`
                 };
+                // DEBUG - console.log('Auth header sent:', fetchOptions.headers['Authorization']);
             }
             
             // Add timeout with AbortController
@@ -144,7 +145,7 @@ export function useDevices() {
             const updatedDevice = await makeApiCall(`${DEVICES_API_URL}/${id}/toggle`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
-            }, false); // Devices don't require authentication in your current implementation
+            }, true); // Devices don't require authentication in your current implementation
             
             if (updatedDevice) {
                 // Apply the update from the server immediately
@@ -203,7 +204,7 @@ export function useDevices() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ desiredState })
-            }, false); // Devices don't require authentication in your current implementation
+            }, true); // Devices don't require authentication in your current implementation
             
             if (updatedLights) {
                 // Update only light devices in state
@@ -259,7 +260,7 @@ export function useDevices() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ temperature: newTemp })
-            }, false); // Devices don't require authentication in your current implementation
+            }, true); // Devices don't require authentication in your current implementation
             
             if (updatedDevice) {
                 setDevices(prev => prev.map(device => 
@@ -305,7 +306,7 @@ export function useDevices() {
                     entityId: deviceData.entityId || null,
                     attributes: deviceData.attributes || {}
                 })
-            }, false); // Devices don't require authentication in your current implementation
+            }, true); // Devices don't require authentication in your current implementation
             
             if (newDevice) {
                 await fetchDevices();
@@ -328,7 +329,7 @@ export function useDevices() {
             
             const result = await makeApiCall(`${DEVICES_API_URL}/${id}`, {
                 method: 'DELETE'
-            }, false); // Devices don't require authentication in your current implementation
+            }, true); // Devices don't require authentication in your current implementation
             
             if (result) {
                 await fetchDevices();

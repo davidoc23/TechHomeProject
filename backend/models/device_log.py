@@ -2,7 +2,7 @@ from datetime import datetime
 import db
 
 def log_device_action(user, device, action, result):
-    print("About to log to MongoDB")
+    # DEBUG - print("About to log to MongoDB")
     # Safe fallback values for all fields
     user = user or "unknown"
     device = device or "unknown"
