@@ -11,6 +11,7 @@ from routes.auth_routes import auth_routes
 from routes.ml_routes import ml_routes
 import db
 from scheduler import start_scheduler, schedule_automations
+from routes.analytics_routes import analytics_routes
 
 app = Flask(__name__)
 app.url_map.strict_slashes = False
@@ -347,6 +348,8 @@ app.register_blueprint(room_routes, url_prefix='/api/rooms')
 app.register_blueprint(automation_routes, url_prefix='/api/automations')
 app.register_blueprint(home_assistant_routes, url_prefix='/api/home-assistant')
 app.register_blueprint(ml_routes, url_prefix='/api/ml')
+app.register_blueprint(analytics_routes, url_prefix='/api/analytics')
+
 
 # Refresh scheduled automations after any request
 @app.after_request
