@@ -1,9 +1,27 @@
 import os
 import requests
+import db
 from flask import Blueprint, jsonify, request
 from bson import ObjectId
 from db import devices_collection, rooms_collection
 from dotenv import load_dotenv
+from models.device_log import log_device_action
+from flask_jwt_extended import get_jwt_identity, jwt_required 
+
+# Helper function to get user identity, defaulting to "system" if JWT is not available
+def get_user_identity():
+    try:
+        user_id = get_jwt_identity()
+        if not user_id:
+            return "system"
+        user = db.find_user_by_id(user_id)
+        if user and 'username' in user:
+            return user['username']
+        else:
+            return "unknown"
+    except Exception:
+        return "system"
+
 # Import ML functionality (will gracefully skip if not available)
 try:
     from ml_models import update_device_history
@@ -89,15 +107,17 @@ def get_devices_by_room(room_id):
         return jsonify({"error": str(e)}), 500
     
 @device_routes.route('/', methods=['POST'])
+@jwt_required()
 def add_device():
+    user = get_user_identity()
     try:
-        # DEBUG - 🔹 Log the raw HTTP request body before parsing
+        # DEBUG - Log the raw HTTP request body before parsing
         # DEBUG - raw_data = request.data.decode('utf-8')
-        # DEBUG - print("📩 Raw request body:", raw_data)  
+        # DEBUG - print(" Raw request body:", raw_data)  
 
-        # DEBUG - 🔹 Force JSON parsing to catch missing fields
+        # DEBUG - Force JSON parsing to catch missing fields
         data = request.get_json(force=True)
-        # DEBUG - print("🔹 Parsed JSON:", data)  # Debugging
+        # DEBUG - print(" Parsed JSON:", data)  # Debugging
 
         if not data or 'name' not in data or 'type' not in data or 'roomId' not in data:
             return jsonify({"error": "Name, type, and roomId required"}), 400
@@ -112,7 +132,7 @@ def add_device():
         if data.get('isHomeAssistant') and 'entityId' in data:
             is_on = get_homeassistant_state(data['entityId'])
 
-        # 🔹 Ensure fields exist and are correctly formatted
+        # Ensure fields exist and are correctly formatted
         new_device = {
             "name": data['name'],
             "type": data['type'],
@@ -124,12 +144,12 @@ def add_device():
         }
 
         # Format response
-        # DEBUG - print("✅ Processed device before insert:", new_device)
+        # DEBUG - print(" Processed device before insert:", new_device)
 
         result = devices_collection.insert_one(new_device)
         inserted_device = devices_collection.find_one({"_id": result.inserted_id})
 
-        # DEBUG - print("✅ Inserted device in MongoDB:", inserted_device)
+        # DEBUG - print(" Inserted device in MongoDB:", inserted_device)
 
         response_device = {
             "id": str(inserted_device['_id']),
@@ -145,18 +165,45 @@ def add_device():
         if 'temperature' in inserted_device:
             response_device['temperature'] = inserted_device['temperature']
 
+        # Log success
+        safe_log_device_action(
+            user=user,
+            device=str(inserted_device['_id']),
+            action="add",
+            result="success"
+        )
+
         return jsonify(response_device), 201
     except Exception as e:
-        # DEBUG - print(f"❌ Error: {str(e)}")
+        # Log failure
+        safe_log_device_action(
+            user=user,
+            device=data.get('name', 'unknown') if 'data' in locals() else "unknown",
+            action="add",
+            result=f"error: {str(e)}"
+        )
+        # DEBUG - print(f" Error: {str(e)}")
         return jsonify({"error": "Failed to add device"}), 500
 
 @device_routes.route('/<device_id>/toggle', methods=['POST'])
+@jwt_required()
 def toggle_device(device_id):
+    # Get the user identity from JWT
+    user = get_user_identity() 
+
     try:
         device_obj_id = ObjectId(device_id)
         device = devices_collection.find_one({"_id": device_obj_id})
-        
+
         if not device:
+            # DEBUG - print(f" Device {device_id} not found")
+            # Log the error for device not found
+            safe_log_device_action(
+                user=user,
+                device=device_id,
+                action="toggle",
+                result="error: device not found"
+            )
             return jsonify({"error": "Device not found"}), 404
 
         new_state = not device.get('isOn', False)
@@ -173,6 +220,14 @@ def toggle_device(device_id):
             ha_response = requests.post(ha_url, json=ha_payload, headers=ha_headers, timeout=2)
 
             if ha_response.status_code != 200:
+                # Log the Home Assistant error
+                # DEBUG - print(f" Home Assistant error for {entity_id}: {ha_response.text}")
+                safe_log_device_action(
+                    user=user,
+                    device=entity_id,
+                    action="toggle",
+                    result=f"error: Home Assistant error {ha_response.text}"
+                )
                 return jsonify({"error": f"Home Assistant error: {ha_response.text}"}), ha_response.status_code
 
         # Update the local database
@@ -192,15 +247,43 @@ def toggle_device(device_id):
             "attributes": device.get("attributes", {})
         }
 
+        # If the device is Home Assistant, update its state
+        safe_log_device_action(
+            user=user,
+            device=device.get("entityId") if device.get("isHomeAssistant") else device_id,
+            action="toggle",
+            result="on" if new_state else "off"
+        )
+
         return jsonify(updated_device), 200
 
     except InvalidId:
+        # Log the error for invalid ObjectId
+        # DEBUG - print(f" Invalid device ID format: {device_id}")
+        safe_log_device_action(
+            user=user,
+            device=device_id,
+            action="toggle",
+            result="error: invalid device id"
+        )
         return jsonify({"error": "Invalid device ID format"}), 400
+    
     except Exception as e:
+        # Log the error
+        # DEBUG - print(f" Error toggling device {device_id}: {str(e)}")
+        safe_log_device_action(
+            user=user,
+            device=device_id,
+            action="toggle",
+            result=f"error: {str(e)}"
+        )
         return jsonify({"error": str(e)}), 500
-  
+
 @device_routes.route('/toggle-all-lights', methods=['POST'])
+@jwt_required()
 def toggle_all_lights():
+    # Get the user identity from JWT
+    user = get_user_identity()
     try:
         data = request.get_json()
         if 'desiredState' not in data:
@@ -238,6 +321,15 @@ def toggle_all_lights():
                 {"_id": ObjectId(device["_id"])},
                 {"$set": {"isOn": desired_state}}
             )
+
+            # Log each light toggle
+            # DEBUG - print(f"Toggling device {device['name']} to {'ON' if desired_state else 'OFF'}")
+            safe_log_device_action(
+                user=user,
+                device=device.get("entityId") if device.get("isHomeAssistant") else str(device["_id"]),
+                action="toggle_all",
+                result="on" if desired_state else "off"
+            )
             
             # Record device state change for ML model
             try:
@@ -257,23 +349,58 @@ def toggle_all_lights():
         return jsonify(updated_lights), 200
 
     except Exception as e:
-        # DEBUG - print(f"❌ Error: {str(e)}")
+        # Log the error
+        # DEBUG - print(f" Error toggling all lights: {str(e)}")
+        safe_log_device_action(
+            user=user,
+            device="all_lights",
+            action="toggle_all",
+            result=f"error: {str(e)}"
+        )
+        # DEBUG - print(f" Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @device_routes.route('/<device_id>/temperature', methods=['POST'])
+@jwt_required()
 def set_temperature(device_id):
+    # Get the user identity from JWT
+    user = get_user_identity()
     try:
         device_obj_id = ObjectId(device_id)
         device = devices_collection.find_one({"_id": device_obj_id})
 
         if not device:
+            # DEBUG - print(f" Device {device_id} not found")
+            # Log the error for device not found
+            safe_log_device_action(
+                user=user,
+                device=device_id,
+                action="set_temperature",
+                result="error: device not found"
+            )
             return jsonify({"error": "Device not found"}), 404
 
         if device['type'] != 'thermostat':
+            # DEBUG - print(f" Device {device_id} is not a thermostat")
+            # Log the error for non-thermostat device
+            safe_log_device_action(
+                user=user,
+                device=device_id,
+                action="set_temperature",
+                result="error: not a thermostat"
+            )
             return jsonify({"error": "Not a thermostat"}), 400
 
         data = request.get_json()
         if not data or 'temperature' not in data:
+            # DEBUG - print(" Temperature data missing")
+            # Log the error for missing temperature data
+            safe_log_device_action(
+                user=user,
+                device=device_id,
+                action="set_temperature",
+                result="error: temperature required"
+            )
             return jsonify({"error": "Temperature required"}), 400
 
         devices_collection.update_one(
@@ -289,20 +416,87 @@ def set_temperature(device_id):
             "temperature": data['temperature']
         }
 
+        # If the device is Home Assistant, update its state
+        safe_log_device_action(
+            user=user,
+            device=device_id,
+            action="set_temperature",
+            result=str(data['temperature'])
+        )
+
         return jsonify(updated_device), 200
 
     except InvalidId:
+        # Log the error for invalid ObjectId
+        # DEBUG - print(f" Invalid device ID format: {device_id}")
+        safe_log_device_action(
+            user=user,
+            device=device_id,
+            action="set_temperature",
+            result="error: invalid device id"
+        )
         return jsonify({"error": "Invalid device ID format"}), 400
     except Exception as e:
+        # Log the error
+        # DEBUG - print(f" Error setting temperature for device {device_id}: {str(e)}")
+        safe_log_device_action(
+            user=user,
+            device=device_id,
+            action="set_temperature",
+            result=f"error: {str(e)}"
+        )
         return jsonify({"error": str(e)}), 500
 
-    
 @device_routes.route('/<device_id>', methods=['DELETE'])
+@jwt_required()
 def remove_device(device_id):
+    # Get the user identity from JWT
+    user = get_user_identity()
     try:
         result = devices_collection.delete_one({"_id": ObjectId(device_id)})
+
         if result.deleted_count:
+            # If the device was successfully deleted, log the action
+            safe_log_device_action(
+                user=user,
+                device=device_id,
+                action="remove",
+                result="success"
+            )
             return jsonify({"message": "Device removed"}), 200
+
+        # If no device was found, log the error
+        safe_log_device_action(
+            user=user,
+            device=device_id,
+            action="remove",
+            result="error: device not found"
+        )
         return jsonify({"error": "Device not found"}), 404
+
     except Exception as e:
+        # Log each remove action, even if it fails
+        # DEBUG - print(f" Error removing device {device_id}: {str(e)}")
+        safe_log_device_action(
+            user=user,
+            device=device_id,
+            action="remove",
+            result=f"error: {str(e)}"
+        )
         return jsonify({"error": str(e)}), 500
+    
+# Helper robust logger
+def safe_log_device_action(user, device, action, result):
+    try:
+        user = user or "unknown"
+        device = device or "unknown"
+        action = action or "unknown"
+        result = result or "unknown"
+        log_device_action(
+            user=user,
+            device=device,
+            action=action,
+            result=result
+        )
+    except Exception as e:
+        print(f"[Logging Error] {e}")

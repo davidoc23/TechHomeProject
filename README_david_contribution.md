@@ -2,9 +2,9 @@
 
 ## Overview
 
-This file details my individual contributions to the TechHomeProject Final Year Project, with a focus on backend integration, Raspberry Pi & Home Assistant setup, and automated testing.
+This file details my individual contributions to the TechHomeProject Final Year Project, with a focus on backend integration, Raspberry Pi & Home Assistant setup, automated testing, user-based device action logging, and analytics endpoints.
 
----
+
 
 ## Key Responsibilities & Achievements
 
@@ -22,6 +22,15 @@ This file details my individual contributions to the TechHomeProject Final Year 
   - Developed logic to toggle all smart lights (including Home Assistant devices) via backend endpoints.
   - Maintained and improved automation execution for Home Assistant devices in `scheduler.py`.
 
+- - **Device Action Logging and User-Based Analytics**
+  - Designed and integrated a robust device action logging system.
+    - Every device action (toggle, add, remove, set temperature, toggle all) is logged with the authenticated username, device, action, result, and timestamp.
+    - Logging works for both successful and failed attempts, ensuring a complete audit trail.
+  - Added JWT authentication and required tokens to device endpoints to enable user attribution.
+  - Built `/api/analytics/usage-per-user` endpoint to aggregate and report device actions by user, supporting usage analytics and security auditing.
+  - Developed automated test cases to verify logging works as expected, including user attribution and database cleanup after each test.
+  - Addressed challenges such as missing JWTs, 404 errors, and log verification by iteratively debugging both backend and frontend, adding cleanup steps, and adjusting test setup to match real-world API flows.
+
 - **Automated Testing**
   - Authored the entire backend test suite (`tests/`), including:
     - Authentication (`test_auth_routes.py`)
@@ -34,20 +43,71 @@ This file details my individual contributions to the TechHomeProject Final Year 
   - Tests cover core API features, error handling, and edge cases to ensure system robustness.
 
 - **Frontend (React Native) Integration**
-  - Built or extended custom hooks (`useHomeAssistantDevices.js`) for managing Home Assistant devices in the mobile app.
+  - Built custom hooks (`useHomeAssistantDevices.js`) for managing Home Assistant devices in the mobile app.
   - Contributed to device management UI (`DeviceManagementScreen.js`) for displaying and adding Home Assistant devices.
+  - Updated all device-related frontend calls to send authentication tokens for secure user attribution.
 
 ---
 
 ## Key Files
 
-- `backend/app.py`, `routes/device_routes.py` – Main endpoints and device logic
+- `backend/app.py`, `routes/device_routes.py` – Main endpoints, device logic, device action logging, JWT checks
+- `backend/routes/analytics_routes.py` – User-based device usage analytics endpoints
 - `backend/scheduler.py` – Automation scheduling for Home Assistant devices
 - `backend/tests/` – Complete backend test suite
 - `TechHome/hooks/useHomeAssistantDevices.js` – Home Assistant device logic in React Native
 - `TechHome/screens/DeviceManagementScreen.js` – Device management UI
 
 ---
+
+## Device Action Logging & Analytics Example
+
+**Device log schema:**
+```json
+{
+  "user": "username",
+  "device": "device_id or entity_id",
+  "action": "toggle | add | remove | set_temperature | toggle_all",
+  "result": "on | off | success | error: ...",
+  "timestamp": "<ISO datetime>"
+}
+
+```
+
+**Analytics endpoint output: (output from Postman)**
+```json
+[
+  {"user": "David", "actions": 4},
+  {"user": "mike", "actions": 12},
+  {"user": "system", "actions": 17}
+]
+```
+
+**Example log entry:**
+```json
+{
+  "user": "David",
+  "device": "680d337b4c5947f7fcc3fc19",
+  "action": "toggle_all",
+  "result": "on",
+  "timestamp": "2025-06-20T22:10:10.333+00:00"
+}
+```
+
+## Key Challenges & Solutions
+
+- **User attribution in logs:**  
+  Initially, all device actions logged as `"system"`. Solved by ensuring JWT tokens were sent from the frontend and adding `@jwt_required()` on backend routes.
+
+- **API test setup:**  
+  Early tests failed with 404 or missing data. Solved by programmatically creating test users, rooms, and devices via the API before running assertions.
+
+- **Database cleanliness:**  
+  Added teardown steps to remove test users, devices, rooms, and logs after each test to prevent polluting the development database.
+
+- **Deprecation warnings:**  
+  Updated datetime code to be timezone-aware to avoid future issues.
+
 
 ## Evidence of Contribution
 
