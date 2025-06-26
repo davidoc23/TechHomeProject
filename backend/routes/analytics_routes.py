@@ -24,14 +24,28 @@ def usage_per_device():
     ]
     results = list(db.device_logs.aggregate(pipeline))
 
-    # Attempt to resolve device names from the devices collection
-    # Assume device IDs are stored as string ObjectIds
-    device_ids = [ObjectId(r["_id"]) for r in results if ObjectId.is_valid(r["_id"])]
-    device_lookup = {str(d["_id"]): d.get("name", str(d["_id"])) for d in db.devices_collection.find({"_id": {"$in": device_ids}})}
+    # Separate ids that are valid ObjectId and those that are not (assume entityId)
+    object_ids = []
+    entity_ids = []
+    for r in results:
+        if ObjectId.is_valid(r["_id"]):
+            object_ids.append(ObjectId(r["_id"]))
+        else:
+            entity_ids.append(r["_id"])
     
+    # Query both by _id and by entityId
+    device_name_map = {}
+    # Find local (ObjectId) devices
+    for d in db.devices_collection.find({"_id": {"$in": object_ids}}):
+        device_name_map[str(d["_id"])] = d.get("name", str(d["_id"]))
+    # Find Home Assistant (entityId) devices
+    if entity_ids:
+        for d in db.devices_collection.find({"entityId": {"$in": entity_ids}}):
+            device_name_map[d.get("entityId")] = d.get("name", d.get("entityId"))
+
     data = []
     for r in results:
-        name = device_lookup.get(r["_id"], r["_id"])  # fallback to ID if no name
+        name = device_name_map.get(r["_id"], r["_id"])
         data.append({"device": r["_id"], "actions": r["actions"], "name": name})
     return jsonify(data)
 
