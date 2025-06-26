@@ -16,6 +16,7 @@ import DeviceManagementScreen from './screens/DeviceManagementScreen';
 import RoomManagementScreen from './screens/RoomManagementScreen';
 import AutomationScreen from './screens/AutomationScreen';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
+import AnalyticsDashboardScreen from './screens/AnalyticsDashboardScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -42,6 +43,8 @@ function MainTabNavigator() {
             iconName = focused ? 'options' : 'options-outline';
           } else if (route.name === 'Settings') {
             iconName = focused ? 'settings' : 'settings-outline';
+          } else if (route.name === 'Analytics') {
+            iconName = focused ? 'analytics' : 'analytics-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -68,6 +71,7 @@ function MainTabNavigator() {
       <Tab.Screen name="Manage Devices" component={DeviceManagementScreen} />
       <Tab.Screen name="Manage Rooms" component={RoomManagementScreen} />
       <Tab.Screen name="Automation" component={AutomationScreen} />
+      <Tab.Screen name="Analytics" component={AnalyticsDashboardScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );
