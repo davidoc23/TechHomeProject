@@ -24,6 +24,8 @@ def usage_per_device():
     ]
     results = list(db.device_logs.aggregate(pipeline))
 
+    # Attempt to resolve device names from the devices collection
+    # Assume device IDs are stored as string ObjectIds
     device_ids = [ObjectId(r["_id"]) for r in results if ObjectId.is_valid(r["_id"])]
     device_lookup = {str(d["_id"]): d.get("name", str(d["_id"])) for d in db.devices_collection.find({"_id": {"$in": device_ids}})}
     
@@ -61,3 +63,31 @@ def user_actions(username):
         return jsonify({"action": None, "count": 0})
     return jsonify({"action": result[0]["_id"], "count": result[0]["count"]})
 
+# Optionally, you can add top 3 actions (bonus route!)
+@analytics_routes.route('/device-actions/<device_id>/top', methods=['GET'])
+def device_top_actions(device_id):
+    pipeline = [
+        {"$match": {"device": device_id}},
+        {"$group": {"_id": "$action", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 3}
+    ]
+    result = list(db.device_logs.aggregate(pipeline))
+    return jsonify([
+        {"action": row["_id"], "count": row["count"]}
+        for row in result
+    ])
+
+@analytics_routes.route('/user-actions/<username>/top', methods=['GET'])
+def user_top_actions(username):
+    pipeline = [
+        {"$match": {"user": username}},
+        {"$group": {"_id": "$action", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 3}
+    ]
+    result = list(db.device_logs.aggregate(pipeline))
+    return jsonify([
+        {"action": row["_id"], "count": row["count"]}
+        for row in result
+    ])
