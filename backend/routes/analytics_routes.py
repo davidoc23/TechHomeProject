@@ -77,7 +77,7 @@ def user_actions(username):
         return jsonify({"action": None, "count": 0})
     return jsonify({"action": result[0]["_id"], "count": result[0]["count"]})
 
-# Optionally, you can add top 3 actions (bonus route!)
+# Top Actions for Device
 @analytics_routes.route('/device-actions/<device_id>/top', methods=['GET'])
 def device_top_actions(device_id):
     pipeline = [
@@ -92,6 +92,7 @@ def device_top_actions(device_id):
         for row in result
     ])
 
+# Top Actions for User
 @analytics_routes.route('/user-actions/<username>/top', methods=['GET'])
 def user_top_actions(username):
     pipeline = [
@@ -105,3 +106,55 @@ def user_top_actions(username):
         {"action": row["_id"], "count": row["count"]}
         for row in result
     ])
+
+# Recent Actions
+@analytics_routes.route('/recent-actions', methods=['GET'])
+def recent_actions():
+    logs = list(db.device_logs.find().sort("timestamp", -1).limit(5))
+
+    # Collect all device references (ObjectId and entityId)
+    object_ids = set()
+    entity_ids = set()
+    for log in logs:
+        dev = log.get("device")
+        if dev:
+            if ObjectId.is_valid(dev):
+                object_ids.add(ObjectId(dev))
+            else:
+                entity_ids.add(dev)
+
+    # Fetch all devices by _id and entityId
+    lookup_query = []
+    if object_ids:
+        lookup_query.append({"_id": {"$in": list(object_ids)}})
+    if entity_ids:
+        lookup_query.append({"entityId": {"$in": list(entity_ids)}})
+    if lookup_query:
+        all_devices = db.devices_collection.find({"$or": lookup_query})
+    else:
+        all_devices = []
+
+    # Build a lookup map for both types
+    device_lookup = {}
+    for d in all_devices:
+        # Map by Mongo _id string
+        device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
+        # Map by Home Assistant entityId if it exists
+        if "entityId" in d:
+            device_lookup[d["entityId"]] = d.get("name", d["entityId"])
+
+    def get_friendly_name(log):
+        dev_id = log.get("device", "")
+        return device_lookup.get(dev_id, dev_id)
+
+    def serialize(log):
+        return {
+            "user": log.get("user", "unknown"),
+            "device": log.get("device", ""),
+            "device_name": get_friendly_name(log),
+            "action": log.get("action", ""),
+            "result": log.get("result", ""),
+            "timestamp": log.get("timestamp").isoformat() if log.get("timestamp") else "",
+        }
+
+    return jsonify([serialize(l) for l in logs])

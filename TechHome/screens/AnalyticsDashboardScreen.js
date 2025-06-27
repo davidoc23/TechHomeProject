@@ -9,6 +9,8 @@ export default function AnalyticsDashboardScreen() {
   const [userUsage, setUserUsage] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [recentActions, setRecentActions] = useState([]);
+  const [loadingFeed, setLoadingFeed] = useState(true);
 
   // Fetch device usage
   useEffect(() => {
@@ -35,6 +37,20 @@ export default function AnalyticsDashboardScreen() {
       .catch(err => {
         setLoadingUsers(false);
         console.error("Error fetching user usage:", err);
+      });
+  }, []);
+
+    // Fetch recent actions
+  useEffect(() => {
+    fetch('http://localhost:5000/api/analytics/recent-actions')
+      .then(res => res.json())
+      .then(data => {
+        setRecentActions(data);
+        setLoadingFeed(false);
+      })
+      .catch(err => {
+        setLoadingFeed(false);
+        console.error("Error fetching recent actions:", err);
       });
   }, []);
 
@@ -86,6 +102,39 @@ export default function AnalyticsDashboardScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: '#fff' }}>
+        {/* Recent Activity */}
+        <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32 }}>
+        Recent Activity Feed
+        </Text>
+        {loadingFeed ? (
+        <Text style={{ textAlign: 'center' }}>Loading activity feed...</Text>
+        ) : recentActions.length === 0 ? (
+        <Text style={{ textAlign: 'center' }}>No recent activity.</Text>
+        ) : (
+        <View style={{ margin: 20, backgroundColor: '#fafafa', borderRadius: 8, padding: 12 }}>
+            {recentActions.map((item, i) => (
+            <View
+                key={i}
+                style={{
+                borderBottomWidth: i === recentActions.length - 1 ? 0 : 1,
+                borderBottomColor: '#eee',
+                paddingVertical: 10,
+                }}>
+                <Text style={{ fontSize: 16 }}>
+                <Text style={{ fontWeight: 'bold' }}>{item.user || 'Unknown User'}</Text>
+                {" "}{item.action || 'did something'}{" "}
+                <Text style={{ fontWeight: 'bold' }}>{item.device_name || item.device || 'Unknown Device'}</Text>
+                {" "}
+                <Text style={{ color: '#888' }}>{item.result || ''}</Text>
+                </Text>
+                <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
+                {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
+                </Text>
+            </View>
+            ))}
+        </View>
+        )}
+        
       {/* Devices Chart */}
       <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16 }}>
         Most-Used Devices
