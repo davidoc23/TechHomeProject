@@ -1,6 +1,7 @@
 from collections import defaultdict
 from flask import Blueprint, jsonify
 from bson import ObjectId
+from datetime import timedelta
 import db
 
 analytics_routes = Blueprint('analytics_routes', __name__)
@@ -111,9 +112,9 @@ def user_top_actions(username):
 # Recent Actions
 @analytics_routes.route('/recent-actions', methods=['GET'])
 def recent_actions():
-    logs = list(db.device_logs.find().sort("timestamp", -1).limit(5))
+    logs = list(db.device_logs.find().sort("timestamp", -1).limit(20))
 
-    # Collect all device references for lookup
+    # Gather all device references for lookup
     object_ids = set()
     entity_ids = set()
     for log in logs:
@@ -142,33 +143,35 @@ def recent_actions():
         dev_id = log.get("device", "")
         return device_lookup.get(dev_id, dev_id)
 
-    # Group toggle_all actions by (user, timestamp (up to seconds), action)
-    grouped = []
+    # Group toggle_all actions by user and timestamp
+    window_size = 2  # seconds for grouping
     toggle_groups = defaultdict(list)
-    seen_indices = set()
 
-    for idx, log in enumerate(logs):
-        if log.get("action") == "toggle_all":
-            t = log.get("timestamp")
-            ts_str = t.replace(microsecond=0).isoformat() if t else ""
-            key = (log.get("user"), ts_str, log.get("action"))
+    for log in logs:
+        if log.get("action") == "toggle_all" and log.get("timestamp"):
+            t = log["timestamp"].replace(microsecond=0)
+            # Floor to nearest window_size seconds
+            floored_seconds = t.second - (t.second % window_size)
+            bucket = t.replace(second=floored_seconds)
+            key = (log.get("user"), bucket, "toggle_all")
             toggle_groups[key].append(log)
-            seen_indices.add(idx)
 
-    # Create grouped toggle_all entries
-    for key, group in toggle_groups.items():
+    grouped = []
+    used_log_ids = set()
+    for (user, bucket, _), group in toggle_groups.items():
         grouped.append({
-            "user": key[0],
+            "user": user,
             "action": "toggle_all",
             "devices": [get_friendly_name(l) for l in group],
             "result": group[0].get("result", ""),
             "timestamp": group[0].get("timestamp").isoformat() if group[0].get("timestamp") else "",
             "grouped": True
         })
+        used_log_ids.update(id(log) for log in group)
 
-    # Add non-toggle_all actions that weren't part of a group
-    for idx, log in enumerate(logs):
-        if log.get("action") != "toggle_all" or idx not in seen_indices:
+    # Add non-toggle_all actions and ungrouped
+    for log in logs:
+        if not (log.get("action") == "toggle_all" and id(log) in used_log_ids):
             grouped.append({
                 "user": log.get("user", "unknown"),
                 "action": log.get("action", ""),
@@ -178,6 +181,6 @@ def recent_actions():
                 "grouped": False
             })
 
-    # Sort by timestamp descending and limit to 5 items
+    # Sort and return only the latest 5
     grouped.sort(key=lambda x: x["timestamp"], reverse=True)
     return jsonify(grouped[:5])
