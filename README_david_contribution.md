@@ -2,8 +2,7 @@
 
 ## Overview
 
-This file details my individual contributions to the TechHomeProject Final Year Project, with a focus on backend integration, Raspberry Pi & Home Assistant setup, automated testing, user-based device action logging, and analytics endpoints.
-
+This file details my individual contributions to the TechHomeProject Final Year Project, with a focus on backend integration, Raspberry Pi & Home Assistant setup, automated testing, user-based device action logging, analytics endpoints, and the new web analytics dashboard for real-time system monitoring.
 
 
 ## Key Responsibilities & Achievements
@@ -22,14 +21,23 @@ This file details my individual contributions to the TechHomeProject Final Year 
   - Developed logic to toggle all smart lights (including Home Assistant devices) via backend endpoints.
   - Maintained and improved automation execution for Home Assistant devices in `scheduler.py`.
 
-- - **Device Action Logging and User-Based Analytics**
+- **Device Action Logging and User-Based Analytics**
   - Designed and integrated a robust device action logging system.
     - Every device action (toggle, add, remove, set temperature, toggle all) is logged with the authenticated username, device, action, result, and timestamp.
     - Logging works for both successful and failed attempts, ensuring a complete audit trail.
   - Added JWT authentication and required tokens to device endpoints to enable user attribution.
-  - Built `/api/analytics/usage-per-user` endpoint to aggregate and report device actions by user, supporting usage analytics and security auditing.
+  - Built `/api/analytics/usage-per-user` and `/api/analytics/usage-per-device` endpoints to aggregate and report device actions by user and by device, supporting usage analytics and security auditing.
+  - Developed analytics endpoints for top actions, device/user drilldown, and grouped activity logs.
   - Developed automated test cases to verify logging works as expected, including user attribution and database cleanup after each test.
   - Addressed challenges such as missing JWTs, 404 errors, and log verification by iteratively debugging both backend and frontend, adding cleanup steps, and adjusting test setup to match real-world API flows.
+
+- **Web Analytics Dashboard**
+  - Built a React Native (Expo) dashboard for web and mobile:
+    - **Device Usage Chart:** Bar chart showing most-used devices, with friendly device names (from both local Mongo and Home Assistant).
+    - **User Activity Chart:** Bar chart of most frequent users (real user attribution thanks to JWTs).
+    - **Recent Activity Feed:** Feed of latest device actions, grouping "toggle all" actions together for clarity, with device lists as sub-items.
+    - **Live API Integration:** Dashboard pulls from real backend analytics endpoints.
+    - **Handles loading, empty, and error states.**
 
 - **Automated Testing**
   - Authored the entire backend test suite (`tests/`), including:
@@ -52,11 +60,12 @@ This file details my individual contributions to the TechHomeProject Final Year 
 ## Key Files
 
 - `backend/app.py`, `routes/device_routes.py` – Main endpoints, device logic, device action logging, JWT checks
-- `backend/routes/analytics_routes.py` – User-based device usage analytics endpoints
+- `backend/routes/analytics_routes.py` – Analytics endpoints for user and device stats, activity feeds
 - `backend/scheduler.py` – Automation scheduling for Home Assistant devices
 - `backend/tests/` – Complete backend test suite
 - `TechHome/hooks/useHomeAssistantDevices.js` – Home Assistant device logic in React Native
 - `TechHome/screens/DeviceManagementScreen.js` – Device management UI
+- `TechHome/screens/AnalyticsDashboardScreen.js` – New analytics dashboard for web/mobile
 
 ---
 
@@ -71,10 +80,9 @@ This file details my individual contributions to the TechHomeProject Final Year 
   "result": "on | off | success | error: ...",
   "timestamp": "<ISO datetime>"
 }
-
 ```
 
-**Analytics endpoint output: (output from Postman)**
+**Analytics endpoint output (output from Postman):**
 ```json
 [
   {"user": "David", "actions": 4},
@@ -93,7 +101,6 @@ This file details my individual contributions to the TechHomeProject Final Year 
   "timestamp": "2025-06-20T22:10:10.333+00:00"
 }
 ```
-
 ## Key Challenges & Solutions
 
 - **User attribution in logs:**  
@@ -118,7 +125,6 @@ This file details my individual contributions to the TechHomeProject Final Year 
 
 ## Contact
 
-- [oconnordavid18@gmail.com]  
-- [G00400530]  
+- Email: oconnordavid18@gmail.com  
+- Student Number: G00400530
 - B.Sc. (Hons) in Computing in Software Development, ATU Galway
-
