@@ -112,27 +112,50 @@ export default function AnalyticsDashboardScreen() {
         <Text style={{ textAlign: 'center' }}>No recent activity.</Text>
         ) : (
         <View style={{ margin: 20, backgroundColor: '#fafafa', borderRadius: 8, padding: 12 }}>
-            {recentActions.map((item, i) => (
+          {recentActions.map((item, i) => (
             <View
-                key={i}
-                style={{
+              key={i}
+              style={{
                 borderBottomWidth: i === recentActions.length - 1 ? 0 : 1,
                 borderBottomColor: '#eee',
                 paddingVertical: 10,
-                }}>
-                <Text style={{ fontSize: 16 }}>
-                <Text style={{ fontWeight: 'bold' }}>{item.user || 'Unknown User'}</Text>
-                {" "}{item.action || 'did something'}{" "}
-                <Text style={{ fontWeight: 'bold' }}>{item.device_name || item.device || 'Unknown Device'}</Text>
-                {" "}
-                <Text style={{ color: '#888' }}>{item.result || ''}</Text>
-                </Text>
-                <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
-                {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
-                </Text>
+              }}>
+              {item.grouped ? (
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
+                    {item.user} toggled multiple devices
+                  </Text>
+                  <View style={{ marginTop: 4, marginLeft: 16 }}>
+                    {item.devices && item.devices.length > 0 && (
+                      item.devices.map((dev, idx) => (
+                        <Text key={idx} style={{ fontSize: 15, color: '#333' }}>
+                          • {dev}
+                        </Text>
+                      ))
+                    )}
+                  </View>
+                  <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
+                    {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
+                  </Text>
+                </View>
+              ) : (
+                <View>
+                  <Text style={{ fontSize: 16 }}>
+                    <Text style={{ fontWeight: 'bold' }}>{item.user || 'Unknown User'}</Text>
+                    {" "}{item.action || 'did something'}{" "}
+                    <Text style={{ fontWeight: 'bold' }}>{item.device_name || item.device || 'Unknown Device'}</Text>
+                    {" "}
+                    <Text style={{ color: '#888' }}>{item.result || ''}</Text>
+                  </Text>
+                  <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
+                    {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
+                  </Text>
+                </View>
+              )}
             </View>
-            ))}
+          ))}
         </View>
+
         )}
         
       {/* Devices Chart */}

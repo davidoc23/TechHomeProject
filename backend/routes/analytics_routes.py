@@ -1,3 +1,4 @@
+from collections import defaultdict
 from flask import Blueprint, jsonify
 from bson import ObjectId
 import db
@@ -112,7 +113,7 @@ def user_top_actions(username):
 def recent_actions():
     logs = list(db.device_logs.find().sort("timestamp", -1).limit(5))
 
-    # Collect all device references (ObjectId and entityId)
+    # Collect all device references for lookup
     object_ids = set()
     entity_ids = set()
     for log in logs:
@@ -122,8 +123,6 @@ def recent_actions():
                 object_ids.add(ObjectId(dev))
             else:
                 entity_ids.add(dev)
-
-    # Fetch all devices by _id and entityId
     lookup_query = []
     if object_ids:
         lookup_query.append({"_id": {"$in": list(object_ids)}})
@@ -133,28 +132,52 @@ def recent_actions():
         all_devices = db.devices_collection.find({"$or": lookup_query})
     else:
         all_devices = []
-
-    # Build a lookup map for both types
     device_lookup = {}
     for d in all_devices:
-        # Map by Mongo _id string
         device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
-        # Map by Home Assistant entityId if it exists
         if "entityId" in d:
-            device_lookup[d["entityId"]] = d.get("name", d["entityId"])
+            device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
 
     def get_friendly_name(log):
         dev_id = log.get("device", "")
         return device_lookup.get(dev_id, dev_id)
 
-    def serialize(log):
-        return {
-            "user": log.get("user", "unknown"),
-            "device": log.get("device", ""),
-            "device_name": get_friendly_name(log),
-            "action": log.get("action", ""),
-            "result": log.get("result", ""),
-            "timestamp": log.get("timestamp").isoformat() if log.get("timestamp") else "",
-        }
+    # Group toggle_all actions by (user, timestamp (up to seconds), action)
+    grouped = []
+    toggle_groups = defaultdict(list)
+    seen_indices = set()
 
-    return jsonify([serialize(l) for l in logs])
+    for idx, log in enumerate(logs):
+        if log.get("action") == "toggle_all":
+            t = log.get("timestamp")
+            ts_str = t.replace(microsecond=0).isoformat() if t else ""
+            key = (log.get("user"), ts_str, log.get("action"))
+            toggle_groups[key].append(log)
+            seen_indices.add(idx)
+
+    # Create grouped toggle_all entries
+    for key, group in toggle_groups.items():
+        grouped.append({
+            "user": key[0],
+            "action": "toggle_all",
+            "devices": [get_friendly_name(l) for l in group],
+            "result": group[0].get("result", ""),
+            "timestamp": group[0].get("timestamp").isoformat() if group[0].get("timestamp") else "",
+            "grouped": True
+        })
+
+    # Add non-toggle_all actions that weren't part of a group
+    for idx, log in enumerate(logs):
+        if log.get("action") != "toggle_all" or idx not in seen_indices:
+            grouped.append({
+                "user": log.get("user", "unknown"),
+                "action": log.get("action", ""),
+                "device_name": get_friendly_name(log),
+                "result": log.get("result", ""),
+                "timestamp": log.get("timestamp").isoformat() if log.get("timestamp") else "",
+                "grouped": False
+            })
+
+    # Sort by timestamp descending and limit to 5 items
+    grouped.sort(key=lambda x: x["timestamp"], reverse=True)
+    return jsonify(grouped[:5])
