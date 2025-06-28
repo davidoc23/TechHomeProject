@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
 
 const screenWidth = Dimensions.get('window').width - 32;
@@ -7,68 +7,61 @@ const screenWidth = Dimensions.get('window').width - 32;
 export default function AnalyticsDashboardScreen() {
   const [deviceUsage, setDeviceUsage] = useState([]);
   const [userUsage, setUserUsage] = useState([]);
+  const [recentActions, setRecentActions] = useState([]);
+  const [hourlyUsage, setHourlyUsage] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(true);
-  const [recentActions, setRecentActions] = useState([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
-  const [hourlyUsage, setHourlyUsage] = useState([]);
   const [loadingHourly, setLoadingHourly] = useState(true);
 
-  // Fetch device usage
+  // Drill-down state
+  const [selectedHour, setSelectedHour] = useState(null);
+  const [hourActions, setHourActions] = useState([]);
+  const [showHourModal, setShowHourModal] = useState(false);
+  const [loadingHourActions, setLoadingHourActions] = useState(false);
+
+  // Device usage
   useEffect(() => {
     fetch('http://localhost:5000/api/analytics/usage-per-device')
       .then(res => res.json())
-      .then(data => {
-        setDeviceUsage(data);
-        setLoadingDevices(false);
-      })
-      .catch(err => {
-        setLoadingDevices(false);
-        console.error("Error fetching device usage:", err);
-      });
+      .then(data => { setDeviceUsage(data); setLoadingDevices(false); })
+      .catch(() => setLoadingDevices(false));
   }, []);
 
-  // Fetch user usage
+  // User usage
   useEffect(() => {
     fetch('http://localhost:5000/api/analytics/usage-per-user')
       .then(res => res.json())
-      .then(data => {
-        setUserUsage(data);
-        setLoadingUsers(false);
-      })
-      .catch(err => {
-        setLoadingUsers(false);
-        console.error("Error fetching user usage:", err);
-      });
+      .then(data => { setUserUsage(data); setLoadingUsers(false); })
+      .catch(() => setLoadingUsers(false));
   }, []);
 
-  // Fetch recent actions
+  // Recent actions
   useEffect(() => {
     fetch('http://localhost:5000/api/analytics/recent-actions')
       .then(res => res.json())
-      .then(data => {
-        setRecentActions(data);
-        setLoadingFeed(false);
-      })
-      .catch(err => {
-        setLoadingFeed(false);
-        console.error("Error fetching recent actions:", err);
-      });
+      .then(data => { setRecentActions(data); setLoadingFeed(false); })
+      .catch(() => setLoadingFeed(false));
   }, []);
 
-  // Fetch hourly usage
+  // Hourly usage
   useEffect(() => {
     fetch('http://localhost:5000/api/analytics/usage-per-hour')
       .then(res => res.json())
-      .then(data => {
-        setHourlyUsage(data);
-        setLoadingHourly(false);
-      })
-      .catch(err => {
-        setLoadingHourly(false);
-        console.error("Error fetching hourly usage:", err);
-      });
+      .then(data => { setHourlyUsage(data); setLoadingHourly(false); })
+      .catch(() => setLoadingHourly(false));
   }, []);
+
+  // Drill-down by hour
+  const handleHourPress = (hourIdx) => {
+    setSelectedHour(hourIdx);
+    setShowHourModal(true);
+    setLoadingHourActions(true);
+    fetch(`http://localhost:5000/api/analytics/actions-in-hour/${hourIdx}`)
+      .then(res => res.json())
+      .then(data => { setHourActions(data); setLoadingHourActions(false); })
+      .catch(() => setLoadingHourActions(false));
+  };
 
   // Chart configs
   const deviceChartConfig = {
@@ -78,27 +71,21 @@ export default function AnalyticsDashboardScreen() {
     labelColor: (opacity = 1) => `#111`,
     barPercentage: 0.7,
     decimalPlaces: 0,
-    propsForLabels: { fontSize: 12 },
   };
-
   const userChartConfig = {
     ...deviceChartConfig,
     color: (opacity = 1) => `rgba(52, 168, 83, ${opacity})`,
   };
 
-  // Device chart data
+  // Chart data
   const deviceData = {
     labels: deviceUsage.map(row => row.name.length > 8 ? row.name.slice(0, 8) + '…' : row.name),
     datasets: [{ data: deviceUsage.map(row => row.actions) }]
   };
-
-  // User chart data
   const userData = {
     labels: userUsage.map(row => row.user.length > 8 ? row.user.slice(0, 8) + '…' : row.user),
     datasets: [{ data: userUsage.map(row => row.actions) }]
   };
-
-  // Hourly chart data (always 24 values)
   const hourLabels = Array.from({ length: 24 }, (_, i) => i.toString());
   const hourlyData = {
     labels: hourLabels,
@@ -110,9 +97,13 @@ export default function AnalyticsDashboardScreen() {
     }]
   };
 
+  // Overlay bar width
+  const barCount = 24;
+  const barWidth = screenWidth / barCount;
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: '#fff' }}>
-      {/* Recent Activity */}
+      {/* Recent Activity Feed */}
       <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32 }}>
         Recent Activity Feed
       </Text>
@@ -218,7 +209,8 @@ export default function AnalyticsDashboardScreen() {
       {loadingHourly ? (
         <Text style={{ textAlign: 'center', color: '#d32f2f', margin: 20 }}>Loading hourly usage data…</Text>
       ) : (
-        <View>
+        <View style={{ position: 'relative', minHeight: 240 }}>
+          {/* The BarChart */}
           <BarChart
             data={hourlyData}
             width={screenWidth}
@@ -228,9 +220,85 @@ export default function AnalyticsDashboardScreen() {
             showValuesOnTopOfBars={true}
             style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center' }}
           />
+          {/* Transparent overlay for making the x-axis numbers clickable */}
+          <View
+            pointerEvents="box-none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 196,
+              flexDirection: 'row',
+              width: screenWidth,
+              height: 24,
+            }}
+          >
+            {hourLabels.map((label, i) => (
+              <TouchableOpacity
+                key={i}
+                onPress={() => handleHourPress(i)}
+                activeOpacity={0.15}
+                style={{
+                  width: barWidth,
+                  height: 24,
+                  // transparent area, clickable
+                }}
+              />
+            ))}
+          </View>
         </View>
       )}
 
+      {/* Hour Modal Overlay */}
+      {showHourModal && (
+        <View style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 999,
+          backgroundColor: 'rgba(0,0,0,0.4)',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <View style={{
+            backgroundColor: '#fff',
+            borderRadius: 16,
+            padding: 20,
+            minWidth: 320,
+            maxWidth: '90%',
+            maxHeight: '80%',
+            elevation: 4
+          }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8 }}>
+              Activity in Hour {selectedHour}
+            </Text>
+            {loadingHourActions ? (
+              <Text>Loading...</Text>
+            ) : hourActions.length === 0 ? (
+              <Text>No actions recorded for this hour.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 300 }}>
+                {hourActions.map((item, i) => (
+                  <View key={i} style={{ marginBottom: 10 }}>
+                    <Text>
+                      <Text style={{ fontWeight: 'bold' }}>{item.user}</Text>
+                      {" "}{item.action}
+                      {" "}<Text style={{ fontWeight: 'bold' }}>{item.device_name}</Text>
+                      {" "}<Text style={{ color: '#888' }}>{item.result}</Text>
+                    </Text>
+                    <Text style={{ color: '#888', fontSize: 12 }}>
+                      {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : ''}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <TouchableOpacity
+              onPress={() => setShowHourModal(false)}
+              style={{ alignSelf: 'flex-end', marginTop: 10 }}>
+              <Text style={{ color: '#1976d2', fontWeight: 'bold' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </ScrollView>
   );
 }

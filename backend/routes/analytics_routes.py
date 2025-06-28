@@ -1,7 +1,7 @@
 from collections import defaultdict
 from flask import Blueprint, jsonify
 from bson import ObjectId
-from datetime import timedelta
+from datetime import datetime, timedelta
 import db
 
 analytics_routes = Blueprint('analytics_routes', __name__)
@@ -203,3 +203,61 @@ def usage_per_hour():
     hour_map = {r["_id"]: r["actions"] for r in results}
     data = [{"hour": h, "actions": hour_map.get(h, 0)} for h in range(24)]
     return jsonify(data)
+
+# Actions in Hour
+@analytics_routes.route('/actions-in-hour/<int:hour>', methods=['GET'])
+def actions_in_hour(hour):
+    # Today at <hour>:00:00
+    now = datetime.utcnow()
+    start = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+    end = start + timedelta(hours=1)
+
+    # If the hour is in the future (today), fallback to yesterday (for late night clicks)
+    if start > now:
+        start -= timedelta(days=1)
+        end -= timedelta(days=1)
+
+    # Get logs for this hour window
+    logs = list(db.device_logs.find({
+        "timestamp": {"$gte": start, "$lt": end}
+    }).sort("timestamp", 1))
+
+    # Friendly device name lookup
+    object_ids = set()
+    entity_ids = set()
+    for log in logs:
+        dev = log.get("device")
+        if dev:
+            if ObjectId.is_valid(dev):
+                object_ids.add(ObjectId(dev))
+            else:
+                entity_ids.add(dev)
+    lookup_query = []
+    if object_ids:
+        lookup_query.append({"_id": {"$in": list(object_ids)}})
+    if entity_ids:
+        lookup_query.append({"entityId": {"$in": list(entity_ids)}})
+    if lookup_query:
+        all_devices = db.devices_collection.find({"$or": lookup_query})
+    else:
+        all_devices = []
+    device_lookup = {}
+    for d in all_devices:
+        device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
+        if "entityId" in d:
+            device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
+
+    def get_friendly_name(log):
+        dev_id = log.get("device", "")
+        return device_lookup.get(dev_id, dev_id)
+
+    def serialize(log):
+        return {
+            "user": log.get("user", "unknown"),
+            "device": log.get("device", ""),
+            "device_name": get_friendly_name(log),
+            "action": log.get("action", ""),
+            "result": log.get("result", ""),
+            "timestamp": log.get("timestamp").isoformat() if log.get("timestamp") else "",
+        }
+    return jsonify([serialize(l) for l in logs])
