@@ -1,15 +1,37 @@
 from collections import defaultdict
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from bson import ObjectId
 from datetime import datetime, timedelta
 import db
 
 analytics_routes = Blueprint('analytics_routes', __name__)
 
+# Date Range Helper
+def get_date_range():
+    """Return (start, end) datetimes for a given YYYY-MM-DD, or None if no filter."""
+    date_str = request.args.get('date')
+    if not date_str:
+        return None, None
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        start = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+        return start, end
+    except Exception:
+        return None, None
+
 # Usage Per User
 @analytics_routes.route('/usage-per-user', methods=['GET'])
 def usage_per_user():
-    pipeline = [
+    start, end = get_date_range()
+    match = {}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
+
+    pipeline = []
+    if match:
+        pipeline.append({"$match": match})
+    pipeline += [
         {"$group": {"_id": "$user", "action_count": {"$sum": 1}}},
         {"$sort": {"action_count": -1}}
     ]
@@ -20,13 +42,21 @@ def usage_per_user():
 # Usage Per Device (with device name)
 @analytics_routes.route('/usage-per-device', methods=['GET'])
 def usage_per_device():
-    pipeline = [
+    start, end = get_date_range()
+    match = {}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
+
+    pipeline = []
+    if match:
+        pipeline.append({"$match": match})
+    pipeline += [
         {"$group": {"_id": "$device", "actions": {"$sum": 1}}},
         {"$sort": {"actions": -1}}
     ]
     results = list(db.device_logs.aggregate(pipeline))
 
-    # Separate ids that are valid ObjectId and those that are not (assume entityId)
+    # Device name lookup
     object_ids = []
     entity_ids = []
     for r in results:
@@ -34,13 +64,13 @@ def usage_per_device():
             object_ids.append(ObjectId(r["_id"]))
         else:
             entity_ids.append(r["_id"])
-    
+            
     # Query both by _id and by entityId
     device_name_map = {}
     # Find local (ObjectId) devices
     for d in db.devices_collection.find({"_id": {"$in": object_ids}}):
         device_name_map[str(d["_id"])] = d.get("name", str(d["_id"]))
-    # Find Home Assistant (entityId) devices
+    # Find Home Assistant (entityId) devicesame_map[str(d["_id"])] = d.get("name", str(d["_id"]))
     if entity_ids:
         for d in db.devices_collection.find({"entityId": {"$in": entity_ids}}):
             device_name_map[d.get("entityId")] = d.get("name", d.get("entityId"))
@@ -54,8 +84,13 @@ def usage_per_device():
 # Most Frequent Action for a Device
 @analytics_routes.route('/device-actions/<device_id>', methods=['GET'])
 def device_actions(device_id):
+    start, end = get_date_range()
+    match = {"device": device_id}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
+
     pipeline = [
-        {"$match": {"device": device_id}},
+        {"$match": match},
         {"$group": {"_id": "$action", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
         {"$limit": 1}
@@ -68,8 +103,13 @@ def device_actions(device_id):
 # Most Frequent Action for a User
 @analytics_routes.route('/user-actions/<username>', methods=['GET'])
 def user_actions(username):
+    start, end = get_date_range()
+    match = {"user": username}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
+
     pipeline = [
-        {"$match": {"user": username}},
+        {"$match": match},
         {"$group": {"_id": "$action", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
         {"$limit": 1}
@@ -82,8 +122,12 @@ def user_actions(username):
 # Top Actions for Device
 @analytics_routes.route('/device-actions/<device_id>/top', methods=['GET'])
 def device_top_actions(device_id):
+    start, end = get_date_range()
+    match = {"device": device_id}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
     pipeline = [
-        {"$match": {"device": device_id}},
+        {"$match": match},
         {"$group": {"_id": "$action", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
         {"$limit": 3}
@@ -97,8 +141,12 @@ def device_top_actions(device_id):
 # Top Actions for User
 @analytics_routes.route('/user-actions/<username>/top', methods=['GET'])
 def user_top_actions(username):
+    start, end = get_date_range()
+    match = {"user": username}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
     pipeline = [
-        {"$match": {"user": username}},
+        {"$match": match},
         {"$group": {"_id": "$action", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
         {"$limit": 3}
@@ -112,9 +160,14 @@ def user_top_actions(username):
 # Recent Actions
 @analytics_routes.route('/recent-actions', methods=['GET'])
 def recent_actions():
-    logs = list(db.device_logs.find().sort("timestamp", -1).limit(20))
+    start, end = get_date_range()
+    q = {}
+    if start and end:
+        q["timestamp"] = {"$gte": start, "$lt": end}
 
-    # Gather all device references for lookup
+    logs = list(db.device_logs.find(q).sort("timestamp", -1).limit(20))
+
+    # Device name lookup
     object_ids = set()
     entity_ids = set()
     for log in logs:
@@ -150,7 +203,6 @@ def recent_actions():
     for log in logs:
         if log.get("action") == "toggle_all" and log.get("timestamp"):
             t = log["timestamp"].replace(microsecond=0)
-            # Floor to nearest window_size seconds
             floored_seconds = t.second - (t.second % window_size)
             bucket = t.replace(second=floored_seconds)
             key = (log.get("user"), bucket, "toggle_all")
@@ -188,8 +240,15 @@ def recent_actions():
 # Usage Per Hour
 @analytics_routes.route('/usage-per-hour', methods=['GET'])
 def usage_per_hour():
-    # Group actions by hour of day (0-23)
-    pipeline = [
+    start, end = get_date_range()
+    match = {}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
+
+    pipeline = []
+    if match:
+        pipeline.append({"$match": match})
+    pipeline += [
         {
             "$group": {
                 "_id": {"$hour": "$timestamp"},
@@ -199,30 +258,29 @@ def usage_per_hour():
         {"$sort": {"_id": 1}}
     ]
     results = list(db.device_logs.aggregate(pipeline))
-    # Fill in missing hours (0–23)
     hour_map = {r["_id"]: r["actions"] for r in results}
     data = [{"hour": h, "actions": hour_map.get(h, 0)} for h in range(24)]
     return jsonify(data)
 
-# Actions in Hour
+# Actions in Hour 
 @analytics_routes.route('/actions-in-hour/<int:hour>', methods=['GET'])
 def actions_in_hour(hour):
-    # Today at <hour>:00:00
-    now = datetime.utcnow()
-    start = now.replace(hour=hour, minute=0, second=0, microsecond=0)
-    end = start + timedelta(hours=1)
+    # Support date param for filtering
+    start, end = get_date_range()
+    if not start or not end:
+        # fallback: use today or yesterday logic
+        now = datetime.utcnow()
+        start = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+        end = start + timedelta(hours=1)
+        if start > now:
+            start -= timedelta(days=1)
+            end -= timedelta(days=1)
 
-    # If the hour is in the future (today), fallback to yesterday (for late night clicks)
-    if start > now:
-        start -= timedelta(days=1)
-        end -= timedelta(days=1)
-
-    # Get logs for this hour window
     logs = list(db.device_logs.find({
         "timestamp": {"$gte": start, "$lt": end}
     }).sort("timestamp", 1))
 
-    # Friendly device name lookup
+    # Device name lookup
     object_ids = set()
     entity_ids = set()
     for log in logs:

@@ -4,7 +4,16 @@ import { BarChart } from 'react-native-chart-kit';
 
 const screenWidth = Dimensions.get('window').width - 32;
 
+function formatDate(date) {
+  // Convert JS Date to YYYY-MM-DD string
+  return date.toISOString().slice(0, 10);
+}
+
 export default function AnalyticsDashboardScreen() {
+  // Date filter states
+  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+  const [appliedDate, setAppliedDate] = useState(formatDate(new Date()));
+
   const [deviceUsage, setDeviceUsage] = useState([]);
   const [userUsage, setUserUsage] = useState([]);
   const [recentActions, setRecentActions] = useState([]);
@@ -20,44 +29,35 @@ export default function AnalyticsDashboardScreen() {
   const [showHourModal, setShowHourModal] = useState(false);
   const [loadingHourActions, setLoadingHourActions] = useState(false);
 
-  // Device usage
+  // Helper: build query string
+  function dateQuery() {
+    return appliedDate ? `?date=${appliedDate}` : '';
+  }
+
+  // Fetch all analytics data when date changes
   useEffect(() => {
-    fetch('http://localhost:5000/api/analytics/usage-per-device')
-      .then(res => res.json())
-      .then(data => { setDeviceUsage(data); setLoadingDevices(false); })
+    setLoadingDevices(true); setLoadingUsers(true); setLoadingFeed(true); setLoadingHourly(true);
+    fetch(`http://localhost:5000/api/analytics/usage-per-device${dateQuery()}`)
+      .then(res => res.json()).then(data => { setDeviceUsage(data); setLoadingDevices(false); })
       .catch(() => setLoadingDevices(false));
-  }, []);
-
-  // User usage
-  useEffect(() => {
-    fetch('http://localhost:5000/api/analytics/usage-per-user')
-      .then(res => res.json())
-      .then(data => { setUserUsage(data); setLoadingUsers(false); })
+    fetch(`http://localhost:5000/api/analytics/usage-per-user${dateQuery()}`)
+      .then(res => res.json()).then(data => { setUserUsage(data); setLoadingUsers(false); })
       .catch(() => setLoadingUsers(false));
-  }, []);
-
-  // Recent actions
-  useEffect(() => {
-    fetch('http://localhost:5000/api/analytics/recent-actions')
-      .then(res => res.json())
-      .then(data => { setRecentActions(data); setLoadingFeed(false); })
+    fetch(`http://localhost:5000/api/analytics/recent-actions${dateQuery()}`)
+      .then(res => res.json()).then(data => { setRecentActions(data); setLoadingFeed(false); })
       .catch(() => setLoadingFeed(false));
-  }, []);
-
-  // Hourly usage
-  useEffect(() => {
-    fetch('http://localhost:5000/api/analytics/usage-per-hour')
-      .then(res => res.json())
-      .then(data => { setHourlyUsage(data); setLoadingHourly(false); })
+    fetch(`http://localhost:5000/api/analytics/usage-per-hour${dateQuery()}`)
+      .then(res => res.json()).then(data => { setHourlyUsage(data); setLoadingHourly(false); })
       .catch(() => setLoadingHourly(false));
-  }, []);
+  }, [appliedDate]);
 
   // Drill-down by hour
   const handleHourPress = (hourIdx) => {
     setSelectedHour(hourIdx);
     setShowHourModal(true);
     setLoadingHourActions(true);
-    fetch(`http://localhost:5000/api/analytics/actions-in-hour/${hourIdx}`)
+    // Pass date to actions-in-hour endpoint!
+    fetch(`http://localhost:5000/api/analytics/actions-in-hour/${hourIdx}${dateQuery()}`)
       .then(res => res.json())
       .then(data => { setHourActions(data); setLoadingHourActions(false); })
       .catch(() => setLoadingHourActions(false));
@@ -87,6 +87,8 @@ export default function AnalyticsDashboardScreen() {
     datasets: [{ data: userUsage.map(row => row.actions) }]
   };
   const hourLabels = Array.from({ length: 24 }, (_, i) => i.toString());
+  const barCount = 24;
+  const barWidth = screenWidth / barCount;
   const hourlyData = {
     labels: hourLabels,
     datasets: [{
@@ -97,12 +99,33 @@ export default function AnalyticsDashboardScreen() {
     }]
   };
 
-  // Overlay bar width
-  const barCount = 24;
-  const barWidth = screenWidth / barCount;
-
   return (
     <ScrollView style={{ flex: 1, backgroundColor: '#fff' }}>
+      {/* Date Picker */}
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', margin: 16,
+        marginBottom: 0, marginTop: 24
+      }}>
+        <Text style={{ fontWeight: 'bold', marginRight: 8 }}>Date:</Text>
+        {/* For web - use <input type="date" /> */}
+        <input
+          type="date"
+          value={selectedDate}
+          max={formatDate(new Date())}
+          onChange={e => setSelectedDate(e.target.value)}
+          style={{
+            border: '1px solid #ccc', borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12
+          }}
+        />
+        <TouchableOpacity
+          onPress={() => setAppliedDate(selectedDate)}
+          style={{
+            backgroundColor: '#1976d2', borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14
+          }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Apply</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Recent Activity Feed */}
       <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32 }}>
         Recent Activity Feed
@@ -268,7 +291,7 @@ export default function AnalyticsDashboardScreen() {
             elevation: 4
           }}>
             <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8 }}>
-              Activity in Hour {selectedHour}
+              Activity in Hour {selectedHour} ({appliedDate})
             </Text>
             {loadingHourActions ? (
               <Text>Loading...</Text>
