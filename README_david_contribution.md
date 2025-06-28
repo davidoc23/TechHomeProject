@@ -1,4 +1,4 @@
-# Individual Contribution – [David]
+# Individual Contribution – David O' Connor
 
 ## Overview
 
@@ -18,7 +18,7 @@ This file details my individual contributions to the TechHomeProject Final Year 
   - Supported device discovery, control, and state management in the backend logic.
 
 - **Device and Automation Management**
-  - Developed logic to toggle all smart lights (including Home Assistant devices) via backend endpoints.
+  - Developed logic to toggle all Home Assistant smart lights via backend endpoints.
   - Maintained and improved automation execution for Home Assistant devices in `scheduler.py`.
 
 - **Device Action Logging and User-Based Analytics**
@@ -32,11 +32,13 @@ This file details my individual contributions to the TechHomeProject Final Year 
   - Addressed challenges such as missing JWTs, 404 errors, and log verification by iteratively debugging both backend and frontend, adding cleanup steps, and adjusting test setup to match real-world API flows.
 
 - **Web Analytics Dashboard**
-  - Built a React Native (Expo) dashboard for web and mobile:
+  - Built a React Native (Expo) dashboard for web:
     - **Device Usage Chart:** Bar chart showing most-used devices, with friendly device names (from both local Mongo and Home Assistant).
     - **User Activity Chart:** Bar chart of most frequent users (real user attribution thanks to JWTs).
     - **Recent Activity Feed:** Feed of latest device actions, grouping "toggle all" actions together for clarity, with device lists as sub-items.
     - **Live API Integration:** Dashboard pulls from real backend analytics endpoints.
+    - **Date Picker & Filtering** – Select a date to view analytics for that day only.
+    - **Hourly Drill-Down** – Click any hour in the usage chart to see a detailed modal of all actions/devices in that hour.
     - **Handles loading, empty, and error states.**
 
 - **Automated Testing**
@@ -114,6 +116,23 @@ This file details my individual contributions to the TechHomeProject Final Year 
 
 - **Deprecation warnings:**  
   Updated datetime code to be timezone-aware to avoid future issues.
+
+- **Date-Based Analytics & Drilldown**
+Built per-day analytics and hour-by-hour activity breakdowns, making analytics highly interactive and audit-friendly.
+
+- **Timezone Handling (Attempted)**
+Spent significant time trying to fix a bug where times/logs show one hour behind local time (Ireland):
+
+  - Made all logs timezone-aware (stored in UTC).
+
+  - Used pytz to convert all backend date filters and queries to/from Europe/Dublin local time.
+
+  - Ensured frontend displays times using browser/device’s local time zone.
+
+  - Cross-checked all logic in both backend and frontend.
+
+  **Result:**
+    - The dashboard still shows analytics times one hour behind Ireland's local time, even after these changes. This may be a subtle bug in timestamp conversion, daylight saving time logic, or frontend Date rendering.
 
 
 ## Evidence of Contribution
