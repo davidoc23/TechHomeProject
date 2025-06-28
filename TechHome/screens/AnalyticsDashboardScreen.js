@@ -11,6 +11,8 @@ export default function AnalyticsDashboardScreen() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [recentActions, setRecentActions] = useState([]);
   const [loadingFeed, setLoadingFeed] = useState(true);
+  const [hourlyUsage, setHourlyUsage] = useState([]);
+  const [loadingHourly, setLoadingHourly] = useState(true);
 
   // Fetch device usage
   useEffect(() => {
@@ -40,7 +42,7 @@ export default function AnalyticsDashboardScreen() {
       });
   }, []);
 
-    // Fetch recent actions
+  // Fetch recent actions
   useEffect(() => {
     fetch('http://localhost:5000/api/analytics/recent-actions')
       .then(res => res.json())
@@ -54,11 +56,25 @@ export default function AnalyticsDashboardScreen() {
       });
   }, []);
 
+  // Fetch hourly usage
+  useEffect(() => {
+    fetch('http://localhost:5000/api/analytics/usage-per-hour')
+      .then(res => res.json())
+      .then(data => {
+        setHourlyUsage(data);
+        setLoadingHourly(false);
+      })
+      .catch(err => {
+        setLoadingHourly(false);
+        console.error("Error fetching hourly usage:", err);
+      });
+  }, []);
+
   // Chart configs
   const deviceChartConfig = {
     backgroundGradientFrom: "#fff",
     backgroundGradientTo: "#fff",
-    color: (opacity = 1) => `rgba(56, 122, 238, ${opacity})`, // blue
+    color: (opacity = 1) => `rgba(56, 122, 238, ${opacity})`,
     labelColor: (opacity = 1) => `#111`,
     barPercentage: 0.7,
     decimalPlaces: 0,
@@ -67,50 +83,44 @@ export default function AnalyticsDashboardScreen() {
 
   const userChartConfig = {
     ...deviceChartConfig,
-    color: (opacity = 1) => `rgba(52, 168, 83, ${opacity})`, // green
+    color: (opacity = 1) => `rgba(52, 168, 83, ${opacity})`,
   };
 
-  // Chart data
+  // Device chart data
   const deviceData = {
     labels: deviceUsage.map(row => row.name.length > 8 ? row.name.slice(0, 8) + '…' : row.name),
     datasets: [{ data: deviceUsage.map(row => row.actions) }]
   };
 
+  // User chart data
   const userData = {
     labels: userUsage.map(row => row.user.length > 8 ? row.user.slice(0, 8) + '…' : row.user),
     datasets: [{ data: userUsage.map(row => row.actions) }]
   };
 
-  // Helper for rendering values above bars
-  function renderValuesAboveBars(data) {
-    return data.map((val, idx) => (
-      <Text
-        key={idx}
-        style={{
-          position: 'absolute',
-          left: (screenWidth / data.length) * idx + 20,
-          top: 4,
-          fontSize: 12,
-          fontWeight: 'bold',
-          color: '#444',
-        }}
-      >
-        {val}
-      </Text>
-    ));
-  }
+  // Hourly chart data (always 24 values)
+  const hourLabels = Array.from({ length: 24 }, (_, i) => i.toString());
+  const hourlyData = {
+    labels: hourLabels,
+    datasets: [{
+      data: hourLabels.map(hour => {
+        const found = hourlyUsage.find(r => String(r.hour) === String(hour));
+        return found ? found.actions : 0;
+      })
+    }]
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: '#fff' }}>
-        {/* Recent Activity */}
-        <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32 }}>
+      {/* Recent Activity */}
+      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32 }}>
         Recent Activity Feed
-        </Text>
-        {loadingFeed ? (
+      </Text>
+      {loadingFeed ? (
         <Text style={{ textAlign: 'center' }}>Loading activity feed...</Text>
-        ) : recentActions.length === 0 ? (
+      ) : recentActions.length === 0 ? (
         <Text style={{ textAlign: 'center' }}>No recent activity.</Text>
-        ) : (
+      ) : (
         <View style={{ margin: 20, backgroundColor: '#fafafa', borderRadius: 8, padding: 12 }}>
           {recentActions.map((item, i) => (
             <View
@@ -155,9 +165,8 @@ export default function AnalyticsDashboardScreen() {
             </View>
           ))}
         </View>
+      )}
 
-        )}
-        
       {/* Devices Chart */}
       <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16 }}>
         Most-Used Devices
@@ -176,9 +185,7 @@ export default function AnalyticsDashboardScreen() {
             chartConfig={deviceChartConfig}
             showValuesOnTopOfBars={true}
             style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center' }}
-            //verticalLabelRotation={-25}
           />
-
         </View>
       )}
 
@@ -200,9 +207,27 @@ export default function AnalyticsDashboardScreen() {
             chartConfig={userChartConfig}
             showValuesOnTopOfBars={true}
             style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center' }}
-            //verticalLabelRotation={-25}
           />
-         
+        </View>
+      )}
+
+      {/* Hourly Usage Trends Chart */}
+      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32 }}>
+        Hourly Usage Trends
+      </Text>
+      {loadingHourly ? (
+        <Text style={{ textAlign: 'center', color: '#d32f2f', margin: 20 }}>Loading hourly usage data…</Text>
+      ) : (
+        <View>
+          <BarChart
+            data={hourlyData}
+            width={screenWidth}
+            height={220}
+            fromZero
+            chartConfig={deviceChartConfig}
+            showValuesOnTopOfBars={true}
+            style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center' }}
+          />
         </View>
       )}
 

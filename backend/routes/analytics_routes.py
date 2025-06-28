@@ -184,3 +184,22 @@ def recent_actions():
     # Sort and return only the latest 5
     grouped.sort(key=lambda x: x["timestamp"], reverse=True)
     return jsonify(grouped[:5])
+
+# Usage Per Hour
+@analytics_routes.route('/usage-per-hour', methods=['GET'])
+def usage_per_hour():
+    # Group actions by hour of day (0-23)
+    pipeline = [
+        {
+            "$group": {
+                "_id": {"$hour": "$timestamp"},
+                "actions": {"$sum": 1}
+            }
+        },
+        {"$sort": {"_id": 1}}
+    ]
+    results = list(db.device_logs.aggregate(pipeline))
+    # Fill in missing hours (0–23)
+    hour_map = {r["_id"]: r["actions"] for r in results}
+    data = [{"hour": h, "actions": hour_map.get(h, 0)} for h in range(24)]
+    return jsonify(data)
