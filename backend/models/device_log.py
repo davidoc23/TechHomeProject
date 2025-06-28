@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import db
 
 def log_device_action(user, device, action, result):
@@ -15,5 +15,5 @@ def log_device_action(user, device, action, result):
         "device": device,
         "action": action,
         "result": result,
-        "timestamp": datetime.utcnow()
+        "timestamp": datetime.now(timezone.utc)
     })

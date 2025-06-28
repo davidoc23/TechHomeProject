@@ -1,22 +1,26 @@
-from collections import defaultdict
+from collections import defaultdict 
 from flask import Blueprint, jsonify, request
 from bson import ObjectId
 from datetime import datetime, timedelta
+from pytz import timezone, utc
 import db
 
 analytics_routes = Blueprint('analytics_routes', __name__)
 
-# Date Range Helper
 def get_date_range():
-    """Return (start, end) datetimes for a given YYYY-MM-DD, or None if no filter."""
+    """Return (start, end) datetimes for a given YYYY-MM-DD in UTC, or None if no filter."""
     date_str = request.args.get('date')
     if not date_str:
         return None, None
     try:
+        irl = timezone('Europe/Dublin')
         dt = datetime.strptime(date_str, "%Y-%m-%d")
-        start = dt.replace(hour=0, minute=0, second=0, microsecond=0)
-        end = start + timedelta(days=1)
-        return start, end
+        start_irl = irl.localize(dt.replace(hour=0, minute=0, second=0, microsecond=0))
+        end_irl = start_irl + timedelta(days=1)
+        # Convert to UTC for DB filtering
+        start_utc = start_irl.astimezone(utc)
+        end_utc = end_irl.astimezone(utc)
+        return start_utc, end_utc
     except Exception:
         return None, None
 
@@ -27,7 +31,6 @@ def usage_per_user():
     match = {}
     if start and end:
         match["timestamp"] = {"$gte": start, "$lt": end}
-
     pipeline = []
     if match:
         pipeline.append({"$match": match})
@@ -46,7 +49,6 @@ def usage_per_device():
     match = {}
     if start and end:
         match["timestamp"] = {"$gte": start, "$lt": end}
-
     pipeline = []
     if match:
         pipeline.append({"$match": match})
@@ -55,8 +57,6 @@ def usage_per_device():
         {"$sort": {"actions": -1}}
     ]
     results = list(db.device_logs.aggregate(pipeline))
-
-    # Device name lookup
     object_ids = []
     entity_ids = []
     for r in results:
@@ -64,17 +64,12 @@ def usage_per_device():
             object_ids.append(ObjectId(r["_id"]))
         else:
             entity_ids.append(r["_id"])
-            
-    # Query both by _id and by entityId
     device_name_map = {}
-    # Find local (ObjectId) devices
     for d in db.devices_collection.find({"_id": {"$in": object_ids}}):
         device_name_map[str(d["_id"])] = d.get("name", str(d["_id"]))
-    # Find Home Assistant (entityId) devicesame_map[str(d["_id"])] = d.get("name", str(d["_id"]))
     if entity_ids:
         for d in db.devices_collection.find({"entityId": {"$in": entity_ids}}):
             device_name_map[d.get("entityId")] = d.get("name", d.get("entityId"))
-
     data = []
     for r in results:
         name = device_name_map.get(r["_id"], r["_id"])
@@ -88,7 +83,6 @@ def device_actions(device_id):
     match = {"device": device_id}
     if start and end:
         match["timestamp"] = {"$gte": start, "$lt": end}
-
     pipeline = [
         {"$match": match},
         {"$group": {"_id": "$action", "count": {"$sum": 1}}},
@@ -107,7 +101,6 @@ def user_actions(username):
     match = {"user": username}
     if start and end:
         match["timestamp"] = {"$gte": start, "$lt": end}
-
     pipeline = [
         {"$match": match},
         {"$group": {"_id": "$action", "count": {"$sum": 1}}},
@@ -164,10 +157,7 @@ def recent_actions():
     q = {}
     if start and end:
         q["timestamp"] = {"$gte": start, "$lt": end}
-
     logs = list(db.device_logs.find(q).sort("timestamp", -1).limit(20))
-
-    # Device name lookup
     object_ids = set()
     entity_ids = set()
     for log in logs:
@@ -196,10 +186,8 @@ def recent_actions():
         dev_id = log.get("device", "")
         return device_lookup.get(dev_id, dev_id)
 
-    # Group toggle_all actions by user and timestamp
     window_size = 2  # seconds for grouping
     toggle_groups = defaultdict(list)
-
     for log in logs:
         if log.get("action") == "toggle_all" and log.get("timestamp"):
             t = log["timestamp"].replace(microsecond=0)
@@ -221,7 +209,6 @@ def recent_actions():
         })
         used_log_ids.update(id(log) for log in group)
 
-    # Add non-toggle_all actions and ungrouped
     for log in logs:
         if not (log.get("action") == "toggle_all" and id(log) in used_log_ids):
             grouped.append({
@@ -232,55 +219,66 @@ def recent_actions():
                 "timestamp": log.get("timestamp").isoformat() if log.get("timestamp") else "",
                 "grouped": False
             })
-
-    # Sort and return only the latest 5
     grouped.sort(key=lambda x: x["timestamp"], reverse=True)
     return jsonify(grouped[:5])
 
-# Usage Per Hour
+# Usage Per Hour 
 @analytics_routes.route('/usage-per-hour', methods=['GET'])
 def usage_per_hour():
     start, end = get_date_range()
-    match = {}
+    irl = timezone('Europe/Dublin')
+    q = {}
     if start and end:
-        match["timestamp"] = {"$gte": start, "$lt": end}
-
-    pipeline = []
-    if match:
-        pipeline.append({"$match": match})
-    pipeline += [
-        {
-            "$group": {
-                "_id": {"$hour": "$timestamp"},
-                "actions": {"$sum": 1}
-            }
-        },
-        {"$sort": {"_id": 1}}
-    ]
-    results = list(db.device_logs.aggregate(pipeline))
-    hour_map = {r["_id"]: r["actions"] for r in results}
-    data = [{"hour": h, "actions": hour_map.get(h, 0)} for h in range(24)]
+        q["timestamp"] = {"$gte": start, "$lt": end}
+    logs = list(db.device_logs.find(q))
+    hour_counts = [0] * 24
+    for log in logs:
+        ts = log.get("timestamp")
+        if ts:
+            local_hour = ts.astimezone(irl).hour
+            hour_counts[local_hour] += 1
+    data = [{"hour": h, "actions": hour_counts[h]} for h in range(24)]
     return jsonify(data)
 
 # Actions in Hour 
 @analytics_routes.route('/actions-in-hour/<int:hour>', methods=['GET'])
 def actions_in_hour(hour):
-    # Support date param for filtering
-    start, end = get_date_range()
-    if not start or not end:
-        # fallback: use today or yesterday logic
-        now = datetime.utcnow()
-        start = now.replace(hour=hour, minute=0, second=0, microsecond=0)
-        end = start + timedelta(hours=1)
-        if start > now:
-            start -= timedelta(days=1)
-            end -= timedelta(days=1)
+    irl = timezone('Europe/Dublin')
+    date_str = request.args.get('date')
 
-    logs = list(db.device_logs.find({
-        "timestamp": {"$gte": start, "$lt": end}
-    }).sort("timestamp", 1))
+    if date_str:
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            start_local = irl.localize(dt.replace(hour=0, minute=0, second=0, microsecond=0))
+            end_local = start_local + timedelta(days=1)
+            start_utc = start_local.astimezone(utc)
+            end_utc = end_local.astimezone(utc)
+            logs = list(db.device_logs.find({
+                "timestamp": {"$gte": start_utc, "$lt": end_utc}
+            }).sort("timestamp", 1))
+            logs = [
+                log for log in logs
+                if log.get("timestamp") and
+                log["timestamp"].astimezone(irl).hour == hour
+            ]
+        except Exception as e:
+            print("[actions-in-hour] Date parse error:", e)
+            logs = []
+    else:
+        now = datetime.now(irl)
+        start_local = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_local = start_local + timedelta(days=1)
+        start_utc = start_local.astimezone(utc)
+        end_utc = end_local.astimezone(utc)
+        logs = list(db.device_logs.find({
+            "timestamp": {"$gte": start_utc, "$lt": end_utc}
+        }).sort("timestamp", 1))
+        logs = [
+            log for log in logs
+            if log.get("timestamp") and
+            log["timestamp"].astimezone(irl).hour == hour
+        ]
 
-    # Device name lookup
     object_ids = set()
     entity_ids = set()
     for log in logs:
@@ -301,7 +299,7 @@ def actions_in_hour(hour):
         all_devices = []
     device_lookup = {}
     for d in all_devices:
-        device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
+        device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]));
         if "entityId" in d:
             device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
 
