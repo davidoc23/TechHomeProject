@@ -255,58 +255,60 @@ export default function AnalyticsDashboardScreen() {
         </View>
       )}
 
-      {/* Devices Chart */}
-      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, color: theme.text }}>
-        Most-Used Devices
-      </Text>
-      {loadingDevices ? (
-        <Text style={{ textAlign: 'center', color: theme.primary, margin: 20 }}>Loading device data…</Text>
-      ) : deviceUsage.length === 0 ? (
-        <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No device usage data available.</Text>
-      ) : (
-        <View>
-          <BarChart
-            data={deviceData}
-            width={screenWidth}
-            height={220}
-            fromZero
-            chartConfig={deviceChartConfig}
-            showValuesOnTopOfBars={true}
-            style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center', backgroundColor: theme.cardBackground }}
-          />
+      {/* Devices & Users Charts Side by Side */}
+      <View style={{ flexDirection: 'row', marginHorizontal: 8, marginTop: 24 }}>
+        {/* Devices Chart */}
+        <View style={{ flex: 1, marginRight: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 4 }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', marginLeft: 8, marginTop: 8, color: theme.text }}>
+            Most-Used Devices
+          </Text>
+          {loadingDevices ? (
+            <Text style={{ textAlign: 'center', color: theme.primary, margin: 20 }}>Loading device data…</Text>
+          ) : deviceUsage.length === 0 ? (
+            <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No device usage data available.</Text>
+          ) : (
+            <BarChart
+              data={deviceData}
+              width={screenWidth / 2 - 16}
+              height={220}
+              fromZero
+              chartConfig={deviceChartConfig}
+              showValuesOnTopOfBars={true}
+              style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center', backgroundColor: theme.cardBackground }}
+            />
+          )}
         </View>
-      )}
-
-      {/* Users Chart */}
-      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32, color: theme.text }}>
-        Most Frequent Users
-      </Text>
-      {loadingUsers ? (
-        <Text style={{ textAlign: 'center', color: theme.success, margin: 20 }}>Loading user data…</Text>
-      ) : userUsage.length === 0 ? (
-        <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No user data available.</Text>
-      ) : (
-        <View>
-          <BarChart
-            data={userData}
-            width={screenWidth}
-            height={220}
-            fromZero
-            chartConfig={userChartConfig}
-            showValuesOnTopOfBars={true}
-            style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center', backgroundColor: theme.cardBackground }}
-          />
+        {/* Users Chart */}
+        <View style={{ flex: 1, marginLeft: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 4 }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', marginLeft: 8, marginTop: 8, color: theme.text }}>
+            Most Frequent Users
+          </Text>
+          {loadingUsers ? (
+            <Text style={{ textAlign: 'center', color: theme.success, margin: 20 }}>Loading user data…</Text>
+          ) : userUsage.length === 0 ? (
+            <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No user data available.</Text>
+          ) : (
+            <BarChart
+              data={userData}
+              width={screenWidth / 2 - 16}
+              height={220}
+              fromZero
+              chartConfig={userChartConfig}
+              showValuesOnTopOfBars={true}
+              style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center', backgroundColor: theme.cardBackground }}
+            />
+          )}
         </View>
-      )}
+      </View>
 
       {/* Hourly Usage Trends Chart */}
-      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32, color: theme.text }}>
-        Hourly Usage Trends
-      </Text>
-      {loadingHourly ? (
-        <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading hourly usage data…</Text>
-      ) : (
-        <View style={{ position: 'relative', minHeight: 240 }}>
+      <View style={{ flex: 1, marginLeft: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 4, marginTop: 32 }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', marginLeft: 8, marginTop: 8, color: theme.text }}>
+          Hourly Usage Trends
+        </Text>
+        {loadingHourly ? (
+          <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading hourly usage data…</Text>
+        ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View>
               <BarChart
@@ -316,7 +318,7 @@ export default function AnalyticsDashboardScreen() {
                 fromZero
                 chartConfig={deviceChartConfig}
                 showValuesOnTopOfBars={true}
-                style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'flex-start', backgroundColor: theme.cardBackground }}
+                style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center', backgroundColor: theme.cardBackground }}
                 barPercentage={0.7}
               />
               {/* Transparent overlay for making the x-axis numbers clickable */}
@@ -342,8 +344,8 @@ export default function AnalyticsDashboardScreen() {
               </View>
             </View>
           </ScrollView>
-        </View>
-      )}
+        )}
+      </View>
 
       {/* Hour Modal Overlay */}
       {showHourModal && (
