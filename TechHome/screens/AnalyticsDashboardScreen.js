@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
+import { useTheme } from '../context/ThemeContext';
 
 const screenWidth = Dimensions.get('window').width - 32;
 
@@ -28,6 +29,8 @@ export default function AnalyticsDashboardScreen() {
   const [hourActions, setHourActions] = useState([]);
   const [showHourModal, setShowHourModal] = useState(false);
   const [loadingHourActions, setLoadingHourActions] = useState(false);
+
+  const { theme, isDarkMode } = useTheme();
 
   // Helper: build query string
   function dateQuery() {
@@ -65,16 +68,16 @@ export default function AnalyticsDashboardScreen() {
 
   // Chart configs
   const deviceChartConfig = {
-    backgroundGradientFrom: "#fff",
-    backgroundGradientTo: "#fff",
-    color: (opacity = 1) => `rgba(56, 122, 238, ${opacity})`,
-    labelColor: (opacity = 1) => `#111`,
+    backgroundGradientFrom: theme.background,
+    backgroundGradientTo: theme.background,
+    color: (opacity = 1) => isDarkMode ? `rgba(56, 122, 238, ${opacity})` : `rgba(56, 122, 238, ${opacity})`,
+    labelColor: (opacity = 1) => theme.text,
     barPercentage: 0.7,
     decimalPlaces: 0,
   };
   const userChartConfig = {
     ...deviceChartConfig,
-    color: (opacity = 1) => `rgba(52, 168, 83, ${opacity})`,
+    color: (opacity = 1) => isDarkMode ? `rgba(52, 168, 83, ${opacity})` : `rgba(52, 168, 83, ${opacity})`,
   };
 
   // Chart data
@@ -100,13 +103,13 @@ export default function AnalyticsDashboardScreen() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: '#fff' }}>
+    <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
       {/* Date Picker */}
       <View style={{
         flexDirection: 'row', alignItems: 'center', margin: 16,
         marginBottom: 0, marginTop: 24
       }}>
-        <Text style={{ fontWeight: 'bold', marginRight: 8 }}>Date:</Text>
+        <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>Date:</Text>
         {/* For web - use <input type="date" /> */}
         <input
           type="date"
@@ -114,64 +117,66 @@ export default function AnalyticsDashboardScreen() {
           max={formatDate(new Date())}
           onChange={e => setSelectedDate(e.target.value)}
           style={{
-            border: '1px solid #ccc', borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12
+            border: `1px solid ${theme.border}`,
+            borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12,
+            background: theme.cardBackground, color: theme.text
           }}
         />
         <TouchableOpacity
           onPress={() => setAppliedDate(selectedDate)}
           style={{
-            backgroundColor: '#1976d2', borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14
+            backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14
           }}>
           <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Apply</Text>
         </TouchableOpacity>
       </View>
 
       {/* Recent Activity Feed */}
-      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32 }}>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32, color: theme.text }}>
         Recent Activity Feed
       </Text>
       {loadingFeed ? (
-        <Text style={{ textAlign: 'center' }}>Loading activity feed...</Text>
+        <Text style={{ textAlign: 'center', color: theme.text }}>Loading activity feed...</Text>
       ) : recentActions.length === 0 ? (
-        <Text style={{ textAlign: 'center' }}>No recent activity.</Text>
+        <Text style={{ textAlign: 'center', color: theme.textSecondary }}>No recent activity.</Text>
       ) : (
-        <View style={{ margin: 20, backgroundColor: '#fafafa', borderRadius: 8, padding: 12 }}>
+        <View style={{ margin: 20, backgroundColor: theme.cardBackground, borderRadius: 8, padding: 12 }}>
           {recentActions.map((item, i) => (
             <View
               key={i}
               style={{
                 borderBottomWidth: i === recentActions.length - 1 ? 0 : 1,
-                borderBottomColor: '#eee',
+                borderBottomColor: theme.border,
                 paddingVertical: 10,
               }}>
               {item.grouped ? (
                 <View>
-                  <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text }}>
                     {item.user} toggled multiple devices
                   </Text>
                   <View style={{ marginTop: 4, marginLeft: 16 }}>
                     {item.devices && item.devices.length > 0 && (
                       item.devices.map((dev, idx) => (
-                        <Text key={idx} style={{ fontSize: 15, color: '#333' }}>
+                        <Text key={idx} style={{ fontSize: 15, color: theme.textSecondary }}>
                           • {dev}
                         </Text>
                       ))
                     )}
                   </View>
-                  <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
+                  <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>
                     {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
                   </Text>
                 </View>
               ) : (
                 <View>
-                  <Text style={{ fontSize: 16 }}>
-                    <Text style={{ fontWeight: 'bold' }}>{item.user || 'Unknown User'}</Text>
+                  <Text style={{ fontSize: 16, color: theme.text }}>
+                    <Text style={{ fontWeight: 'bold', color: theme.text }}>{item.user || 'Unknown User'}</Text>
                     {" "}{item.action || 'did something'}{" "}
-                    <Text style={{ fontWeight: 'bold' }}>{item.device_name || item.device || 'Unknown Device'}</Text>
+                    <Text style={{ fontWeight: 'bold', color: theme.text }}>{item.device_name || item.device || 'Unknown Device'}</Text>
                     {" "}
-                    <Text style={{ color: '#888' }}>{item.result || ''}</Text>
+                    <Text style={{ color: theme.textTertiary }}>{item.result || ''}</Text>
                   </Text>
-                  <Text style={{ color: '#888', fontSize: 12, marginTop: 2 }}>
+                  <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>
                     {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
                   </Text>
                 </View>
@@ -182,13 +187,13 @@ export default function AnalyticsDashboardScreen() {
       )}
 
       {/* Devices Chart */}
-      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16 }}>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, color: theme.text }}>
         Most-Used Devices
       </Text>
       {loadingDevices ? (
-        <Text style={{ textAlign: 'center', color: '#1976d2', margin: 20 }}>Loading device data…</Text>
+        <Text style={{ textAlign: 'center', color: theme.primary, margin: 20 }}>Loading device data…</Text>
       ) : deviceUsage.length === 0 ? (
-        <Text style={{ textAlign: 'center', color: '#d32f2f', margin: 20 }}>No device usage data available.</Text>
+        <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No device usage data available.</Text>
       ) : (
         <View>
           <BarChart
@@ -198,19 +203,19 @@ export default function AnalyticsDashboardScreen() {
             fromZero
             chartConfig={deviceChartConfig}
             showValuesOnTopOfBars={true}
-            style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center' }}
+            style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center', backgroundColor: theme.cardBackground }}
           />
         </View>
       )}
 
       {/* Users Chart */}
-      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32 }}>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32, color: theme.text }}>
         Most Frequent Users
       </Text>
       {loadingUsers ? (
-        <Text style={{ textAlign: 'center', color: '#388e3c', margin: 20 }}>Loading user data…</Text>
+        <Text style={{ textAlign: 'center', color: theme.success, margin: 20 }}>Loading user data…</Text>
       ) : userUsage.length === 0 ? (
-        <Text style={{ textAlign: 'center', color: '#d32f2f', margin: 20 }}>No user data available.</Text>
+        <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No user data available.</Text>
       ) : (
         <View>
           <BarChart
@@ -220,17 +225,17 @@ export default function AnalyticsDashboardScreen() {
             fromZero
             chartConfig={userChartConfig}
             showValuesOnTopOfBars={true}
-            style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center' }}
+            style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center', backgroundColor: theme.cardBackground }}
           />
         </View>
       )}
 
       {/* Hourly Usage Trends Chart */}
-      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32 }}>
+      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32, color: theme.text }}>
         Hourly Usage Trends
       </Text>
       {loadingHourly ? (
-        <Text style={{ textAlign: 'center', color: '#d32f2f', margin: 20 }}>Loading hourly usage data…</Text>
+        <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading hourly usage data…</Text>
       ) : (
         <View style={{ position: 'relative', minHeight: 240 }}>
           {/* The BarChart */}
@@ -241,7 +246,7 @@ export default function AnalyticsDashboardScreen() {
             fromZero
             chartConfig={deviceChartConfig}
             showValuesOnTopOfBars={true}
-            style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center' }}
+            style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center', backgroundColor: theme.cardBackground }}
           />
           {/* Transparent overlay for making the x-axis numbers clickable */}
           <View
@@ -277,12 +282,12 @@ export default function AnalyticsDashboardScreen() {
           position: 'absolute',
           top: 0, left: 0, right: 0, bottom: 0,
           zIndex: 999,
-          backgroundColor: 'rgba(0,0,0,0.4)',
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)',
           justifyContent: 'center',
           alignItems: 'center'
         }}>
           <View style={{
-            backgroundColor: '#fff',
+            backgroundColor: theme.cardBackground,
             borderRadius: 16,
             padding: 20,
             minWidth: 320,
@@ -290,24 +295,24 @@ export default function AnalyticsDashboardScreen() {
             maxHeight: '80%',
             elevation: 4
           }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8, color: theme.text }}>
               Activity in Hour {selectedHour} ({appliedDate})
             </Text>
             {loadingHourActions ? (
-              <Text>Loading...</Text>
+              <Text style={{ color: theme.text }}>Loading...</Text>
             ) : hourActions.length === 0 ? (
-              <Text>No actions recorded for this hour.</Text>
+              <Text style={{ color: theme.textSecondary }}>No actions recorded for this hour.</Text>
             ) : (
               <ScrollView style={{ maxHeight: 300 }}>
                 {hourActions.map((item, i) => (
                   <View key={i} style={{ marginBottom: 10 }}>
-                    <Text>
-                      <Text style={{ fontWeight: 'bold' }}>{item.user}</Text>
+                    <Text style={{ color: theme.text }}>
+                      <Text style={{ fontWeight: 'bold', color: theme.text }}>{item.user}</Text>
                       {" "}{item.action}
-                      {" "}<Text style={{ fontWeight: 'bold' }}>{item.device_name}</Text>
-                      {" "}<Text style={{ color: '#888' }}>{item.result}</Text>
+                      {" "}<Text style={{ fontWeight: 'bold', color: theme.text }}>{item.device_name}</Text>
+                      {" "}<Text style={{ color: theme.textTertiary }}>{item.result}</Text>
                     </Text>
-                    <Text style={{ color: '#888', fontSize: 12 }}>
+                    <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
                       {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : ''}
                     </Text>
                   </View>
@@ -317,7 +322,7 @@ export default function AnalyticsDashboardScreen() {
             <TouchableOpacity
               onPress={() => setShowHourModal(false)}
               style={{ alignSelf: 'flex-end', marginTop: 10 }}>
-              <Text style={{ color: '#1976d2', fontWeight: 'bold' }}>Close</Text>
+              <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>
