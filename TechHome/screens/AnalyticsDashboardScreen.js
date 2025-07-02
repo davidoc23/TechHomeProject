@@ -56,6 +56,7 @@ export default function AnalyticsDashboardScreen() {
 
   // Drill-down by hour
   const handleHourPress = (hourIdx) => {
+    // console.log('Hour pressed:', hourIdx); // Debug log
     setSelectedHour(hourIdx);
     setShowHourModal(true);
     setLoadingHourActions(true);
@@ -179,7 +180,7 @@ export default function AnalyticsDashboardScreen() {
                   <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>
                     {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
                   </Text>
-                </View>
+                </View> 
               )}
             </View>
           ))}
@@ -238,41 +239,41 @@ export default function AnalyticsDashboardScreen() {
         <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading hourly usage data…</Text>
       ) : (
         <View style={{ position: 'relative', minHeight: 240 }}>
-          {/* The BarChart */}
-          <BarChart
-            data={hourlyData}
-            width={screenWidth}
-            height={220}
-            fromZero
-            chartConfig={deviceChartConfig}
-            showValuesOnTopOfBars={true}
-            style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center', backgroundColor: theme.cardBackground }}
-          />
-          {/* Transparent overlay for making the x-axis numbers clickable */}
-          <View
-            pointerEvents="box-none"
-            style={{
-              position: 'absolute',
-              left: 0,
-              top: 196,
-              flexDirection: 'row',
-              width: screenWidth,
-              height: 24,
-            }}
-          >
-            {hourLabels.map((label, i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => handleHourPress(i)}
-                activeOpacity={0.15}
-                style={{
-                  width: barWidth,
-                  height: 24,
-                  // transparent area, clickable
-                }}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View>
+              <BarChart
+                data={hourlyData}
+                width={barWidth * barCount}
+                height={220}
+                fromZero
+                chartConfig={deviceChartConfig}
+                showValuesOnTopOfBars={true}
+                style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'flex-start', backgroundColor: theme.cardBackground }}
+                barPercentage={0.7}
               />
-            ))}
-          </View>
+              {/* Transparent overlay for making the x-axis numbers clickable */}
+              <View
+                pointerEvents="box-none"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 196,
+                  flexDirection: 'row',
+                  width: barWidth * barCount,
+                  height: 24,
+                }}
+              >
+                {hourLabels.map((label, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => handleHourPress(i)}
+                    activeOpacity={0.15}
+                    style={{ width: barWidth, height: 24 }}
+                  />
+                ))}
+              </View>
+            </View>
+          </ScrollView>
         </View>
       )}
 
@@ -296,7 +297,7 @@ export default function AnalyticsDashboardScreen() {
             elevation: 4
           }}>
             <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8, color: theme.text }}>
-              Activity in Hour {selectedHour} ({appliedDate})
+              Activity in Hour {selectedHour !== null ? `${selectedHour.toString().padStart(2, '0')}:00-${selectedHour.toString().padStart(2, '0')}:59` : ''} ({appliedDate})
             </Text>
             {loadingHourActions ? (
               <Text style={{ color: theme.text }}>Loading...</Text>
