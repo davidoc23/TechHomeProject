@@ -40,6 +40,12 @@ This file details my individual contributions to the TechHomeProject Final Year 
     - **Date Picker & Filtering** – Select a date to view analytics for that day only.
     - **Hourly Drill-Down** – Click any hour in the usage chart to see a detailed modal of all actions/devices in that hour.
     - **Handles loading, empty, and error states.**
+    - **Dark Mode Theming:** The analytics dashboard now fully supports dark mode. All backgrounds, cards, text, and charts adapt dynamically using the app’s theme. Modal overlays, activity feeds, and charts automatically update when the user switches between light and dark mode.
+    - **Improved Hour Display:** Hourly activity modals now display the hour as a full range (e.g., “17:00–17:59”) for clarity. This small UI fix improves time comprehension for end users.
+    - **Timestamp & Timezone Handling:** Substantial work to ensure timestamps/logs display consistently in the user’s local time. All logs are stored in UTC and the frontend attempts to render using local timezone. However, a known issue remains where times may appear one hour behind Ireland local time due to subtle daylight saving handling.
+    - **CSV Export Functionality:** Users and admins can now export/download usage logs as CSV files for offline review, audits, or external reporting.
+    - **No Logs Modal:** A modal now displays clearly when no logs are found for a selected date/filter, improving user feedback.
+    - **Manual and Auto-Refresh:** Added a manual Refresh button to immediately reload analytics for today. The dashboard auto-refreshes every 5 minutes for up-to-date data without user action.
 
 - **Automated Testing**
   - Authored the entire backend test suite (`tests/`), including:
@@ -133,6 +139,14 @@ Spent significant time trying to fix a bug where times/logs show one hour behind
 
   **Result:**
     - The dashboard still shows analytics times one hour behind Ireland's local time, even after these changes. This may be a subtle bug in timestamp conversion, daylight saving time logic, or frontend Date rendering.
+
+- **UI/UX and Theming Enhancements**
+
+  - Added dark mode support for all charts, modals, and activity feeds.
+
+  - Improved time range display for hourly analytics.
+
+  - Added CSV export and “no logs” modal for better feedback and usability.
 
 
 ## Evidence of Contribution
