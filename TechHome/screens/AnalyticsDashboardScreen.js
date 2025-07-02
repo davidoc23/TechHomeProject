@@ -141,7 +141,7 @@ export default function AnalyticsDashboardScreen() {
         <TouchableOpacity
           onPress={() => {
             setSelectedDate(formatDate(new Date()));
-            setAppliedDate(formatDate(new Date()) + '-' + Date.now()); // force a unique value to always trigger useEffect
+            setAppliedDate(formatDate(new Date())); 
           }}
           style={{
             backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14
