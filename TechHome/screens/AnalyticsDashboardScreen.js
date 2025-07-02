@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Dimensions, TouchableOpacity, Linking, Platform, Alert } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
 import { useTheme } from '../context/ThemeContext';
 
@@ -31,6 +31,9 @@ export default function AnalyticsDashboardScreen() {
   const [loadingHourActions, setLoadingHourActions] = useState(false);
 
   const { theme, isDarkMode } = useTheme();
+
+  // No logs modal state
+  const [showNoLogsModal, setShowNoLogsModal] = useState(false);
 
   // Helper: build query string
   function dateQuery() {
@@ -111,6 +114,15 @@ export default function AnalyticsDashboardScreen() {
     }]
   };
 
+  // Show or hide no logs modal based on feed loading and data presence
+  useEffect(() => {
+    if (!loadingFeed && recentActions.length === 0) {
+      setShowNoLogsModal(true);
+    } else {
+      setShowNoLogsModal(false);
+    }
+  }, [loadingFeed, recentActions]);
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
       {/* Date Picker */}
@@ -144,9 +156,47 @@ export default function AnalyticsDashboardScreen() {
             setAppliedDate(formatDate(new Date())); 
           }}
           style={{
-            backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14
+            backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
           }}>
           <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Refresh</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={async () => {
+            const url = `http://localhost:5000/api/analytics/export-usage-csv?date=${appliedDate}`;
+            try {
+              const response = await fetch(url);
+              const contentType = response.headers.get('content-type');
+              if (response.status === 404 || (contentType && contentType.includes('application/json'))) {
+                const data = await response.json();
+                Alert.alert('No Data', data.error || 'No logs found for the selected date.');
+                return;
+              }
+              // If CSV, trigger download
+              if (typeof window !== 'undefined' && window.URL) {
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = 'techhome_usage_logs.csv';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(downloadUrl);
+              } else {
+                Linking.openURL(url);
+              }
+            } catch (err) {
+              Alert.alert('Error', 'Failed to export logs.');
+            }
+          }}
+          style={{
+            backgroundColor: theme.primary,
+            borderRadius: 4,
+            paddingVertical: 6,
+            paddingHorizontal: 14
+          }}
+        >
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Export as CSV</Text>
         </TouchableOpacity>
       </View>
 
@@ -342,6 +392,40 @@ export default function AnalyticsDashboardScreen() {
               onPress={() => setShowHourModal(false)}
               style={{ alignSelf: 'flex-end', marginTop: 10 }}>
               <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* No Logs Modal Popup */}
+      {showNoLogsModal && (
+        <View style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 2000,
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <View style={{
+            backgroundColor: theme.cardBackground,
+            borderRadius: 16,
+            padding: 24,
+            minWidth: 280,
+            maxWidth: '90%',
+            alignItems: 'center',
+            elevation: 5,
+          }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 10, color: theme.text }}>
+              No logs found for this date
+            </Text>
+            <Text style={{ color: theme.textSecondary, marginBottom: 18, textAlign: 'center' }}>
+              There are no activity logs for the selected date.
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowNoLogsModal(false)}
+              style={{ backgroundColor: theme.primary, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 24 }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Close</Text>
             </TouchableOpacity>
           </View>
         </View>

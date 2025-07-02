@@ -4,6 +4,9 @@ from bson import ObjectId
 from datetime import datetime, timedelta
 from pytz import timezone, utc
 import db
+from flask import Response
+import csv
+import io
 
 analytics_routes = Blueprint('analytics_routes', __name__)
 
@@ -317,3 +320,26 @@ def actions_in_hour(hour):
             "timestamp": log.get("timestamp").isoformat() if log.get("timestamp") else "",
         }
     return jsonify([serialize(l) for l in logs])
+
+@analytics_routes.route('/export-usage-csv', methods=['GET'])
+def export_usage_csv():
+    # Example: exporting all device logs
+    logs = list(db.device_logs.find())
+    # Prepare CSV output
+    output = io.StringIO()
+    writer = csv.writer(output)
+    # Write header
+    writer.writerow(['User', 'Device', 'Action', 'Result', 'Timestamp'])
+    # Write data rows
+    for log in logs:
+        writer.writerow([
+            log.get('user', ''),
+            log.get('device', ''),
+            log.get('action', ''),
+            log.get('result', ''),
+            log.get('timestamp', '')
+        ])
+    output.seek(0)
+    return Response(output.getvalue(),
+                    mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment;filename=techhome_usage_logs.csv"})
