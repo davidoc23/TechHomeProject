@@ -54,6 +54,14 @@ export default function AnalyticsDashboardScreen() {
       .catch(() => setLoadingHourly(false));
   }, [appliedDate]);
 
+  // Periodically refresh data every 5 minutes (for the currently applied date)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAppliedDate(prev => prev); // Triggers useEffect to fetch latest data for current date
+    }, 5 * 60 * 1000); // 5 minutes
+    return () => clearInterval(interval);
+  }, []);
+
   // Drill-down by hour
   const handleHourPress = (hourIdx) => {
     // console.log('Hour pressed:', hourIdx); // Debug log
@@ -126,9 +134,19 @@ export default function AnalyticsDashboardScreen() {
         <TouchableOpacity
           onPress={() => setAppliedDate(selectedDate)}
           style={{
-            backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14
+            backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
           }}>
           <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Apply</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {
+            setSelectedDate(formatDate(new Date()));
+            setAppliedDate(formatDate(new Date()) + '-' + Date.now()); // force a unique value to always trigger useEffect
+          }}
+          style={{
+            backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14
+          }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Refresh</Text>
         </TouchableOpacity>
       </View>
 
