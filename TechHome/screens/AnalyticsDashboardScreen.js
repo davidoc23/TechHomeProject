@@ -201,59 +201,70 @@ export default function AnalyticsDashboardScreen() {
       </View>
 
       {/* Recent Activity Feed */}
-      <Text style={{ fontSize: 24, fontWeight: 'bold', margin: 16, marginTop: 32, color: theme.text }}>
-        Recent Activity Feed
-      </Text>
-      {loadingFeed ? (
-        <Text style={{ textAlign: 'center', color: theme.text }}>Loading activity feed...</Text>
-      ) : recentActions.length === 0 ? (
-        <Text style={{ textAlign: 'center', color: theme.textSecondary }}>No recent activity.</Text>
-      ) : (
-        <View style={{ margin: 20, backgroundColor: theme.cardBackground, borderRadius: 8, padding: 12 }}>
-          {recentActions.map((item, i) => (
-            <View
-              key={i}
-              style={{
-                borderBottomWidth: i === recentActions.length - 1 ? 0 : 1,
-                borderBottomColor: theme.border,
-                paddingVertical: 10,
-              }}>
-              {item.grouped ? (
-                <View>
-                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text }}>
-                    {item.user} toggled multiple devices
-                  </Text>
-                  <View style={{ marginTop: 4, marginLeft: 16 }}>
-                    {item.devices && item.devices.length > 0 && (
-                      item.devices.map((dev, idx) => (
-                        <Text key={idx} style={{ fontSize: 15, color: theme.textSecondary }}>
-                          • {dev}
-                        </Text>
-                      ))
-                    )}
+      <View style={{ flex: 1, backgroundColor: theme.cardBackground, borderRadius: 16, marginHorizontal: 15, marginTop: 32, padding: 4, marginBottom: 32, paddingBottom: 45, minHeight: 300}}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', marginLeft: 8, marginTop: 8, color: theme.text, marginHorizontal: 14 }}>
+          Recent Activity Feed
+        </Text>
+        {loadingFeed ? (
+          <Text style={{ textAlign: 'center', color: theme.text, margin: 20 }}>Loading activity feed...</Text>
+        ) : recentActions.length === 0 ? (
+          <Text style={{ textAlign: 'center', color: theme.textSecondary, margin: 20 }}>No recent activity.</Text>
+        ) : (
+          <View style={{ margin: 12, backgroundColor: theme.cardBackground, borderRadius: 8, padding: 0 }}>
+            {recentActions.slice(0, 4).map((item, i, arr) => (
+              <View
+                key={i}
+                style={{
+                  borderBottomWidth: i === arr.length - 1 ? 0 : 1,
+                  borderBottomColor: theme.border,
+                  marginHorizontal: 14,     
+                  marginBottom: 12,          
+                  paddingVertical: 14,
+                  paddingHorizontal: 12,
+                  marginHorizontal: 4,
+                  backgroundColor: i % 2 === 0 ? theme.cardBackground : (theme.feedAltBackground || theme.background),
+                  borderTopLeftRadius: i === 0 ? 8 : 0,
+                  borderTopRightRadius: i === 0 ? 8 : 0,
+                  borderBottomLeftRadius: i === arr.length - 1 ? 8 : 0,
+                  borderBottomRightRadius: i === arr.length - 1 ? 8 : 0,
+                }}>
+                {item.grouped ? (
+                  <View>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text }}>
+                      {item.user} toggled multiple devices
+                    </Text>
+                    <View style={{ marginTop: 4, marginLeft: 16 }}>
+                      {item.devices && item.devices.length > 0 && (
+                        item.devices.map((dev, idx) => (
+                          <Text key={idx} style={{ fontSize: 15, color: theme.textSecondary }}>
+                            • {dev}
+                          </Text>
+                        ))
+                      )}
+                    </View>
+                    <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>
+                      {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
+                    </Text>
                   </View>
-                  <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>
-                    {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
-                  </Text>
-                </View>
-              ) : (
-                <View>
-                  <Text style={{ fontSize: 16, color: theme.text }}>
-                    <Text style={{ fontWeight: 'bold', color: theme.text }}>{item.user || 'Unknown User'}</Text>
-                    {" "}{item.action || 'did something'}{" "}
-                    <Text style={{ fontWeight: 'bold', color: theme.text }}>{item.device_name || item.device || 'Unknown Device'}</Text>
-                    {" "}
-                    <Text style={{ color: theme.textTertiary }}>{item.result || ''}</Text>
-                  </Text>
-                  <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>
-                    {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
-                  </Text>
-                </View> 
-              )}
-            </View>
-          ))}
-        </View>
-      )}
+                ) : (
+                  <View>
+                    <Text style={{ fontSize: 16, color: theme.text }}>
+                      <Text style={{ fontWeight: 'bold', color: theme.text }}>{item.user || 'Unknown User'}</Text>
+                      {" "}{item.action || 'did something'}{" "}
+                      <Text style={{ fontWeight: 'bold', color: theme.text }}>{item.device_name || item.device || 'Unknown Device'}</Text>
+                      {" "}
+                      <Text style={{ color: theme.textTertiary }}>{item.result || ''}</Text>
+                    </Text>
+                    <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>
+                      {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
+                    </Text>
+                  </View> 
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
 
       {/* Devices & Users Charts Side by Side */}
       <View style={{ flexDirection: 'row', marginHorizontal: 8, marginTop: 24 }}>
@@ -302,7 +313,7 @@ export default function AnalyticsDashboardScreen() {
       </View>
 
       {/* Hourly Usage Trends Chart */}
-      <View style={{ flex: 1, marginLeft: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 4, marginTop: 32 }}>
+      <View style={{ flex: 1, marginLeft: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 4, marginTop: 32, paddingBottom: 45 }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold', marginLeft: 8, marginTop: 8, color: theme.text }}>
           Hourly Usage Trends
         </Text>
