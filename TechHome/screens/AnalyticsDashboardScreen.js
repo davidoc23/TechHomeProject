@@ -191,7 +191,7 @@ export default function AnalyticsDashboardScreen() {
               const contentType = response.headers.get('content-type');
               if (response.status === 404 || (contentType && contentType.includes('application/json'))) {
                 const data = await response.json();
-                Alert.alert('No Data', data.error || 'No logs found for the selected range.');
+                setShowNoLogsModal(true); // Show modal instead of Alert
                 return;
               }
               if (typeof window !== 'undefined' && window.URL) {
@@ -208,7 +208,7 @@ export default function AnalyticsDashboardScreen() {
                 Linking.openURL(url);
               }
             } catch (err) {
-              Alert.alert('Error', 'Failed to export logs.');
+              setShowNoLogsModal(true); // Show modal on error as well
             }
           }}
           style={{

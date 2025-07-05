@@ -364,23 +364,53 @@ def actions_in_hour(hour):
 
 @analytics_routes.route('/export-usage-csv', methods=['GET'])
 def export_usage_csv():
-    # Example: exporting all device logs
-    logs = list(db.device_logs.find())
-    # Prepare CSV output
+    # Support single date or date range
+    date_str = request.args.get('date')
+    start_date_str = request.args.get('startDate')
+    end_date_str = request.args.get('endDate')
+    irl = timezone('Europe/Dublin')
+    query = {}
+
+    if start_date_str and end_date_str:
+        try:
+            start_dt = irl.localize(datetime.strptime(start_date_str, "%Y-%m-%d"))
+            end_dt = irl.localize(datetime.strptime(end_date_str, "%Y-%m-%d")) + timedelta(days=1)
+            start_utc = start_dt.astimezone(utc)
+            end_utc = end_dt.astimezone(utc)
+            query['timestamp'] = {'$gte': start_utc, '$lt': end_utc}
+        except Exception:
+            pass
+    elif date_str:
+        try:
+            dt = irl.localize(datetime.strptime(date_str, "%Y-%m-%d"))
+            start_utc = dt.astimezone(utc)
+            end_utc = (dt + timedelta(days=1)).astimezone(utc)
+            query['timestamp'] = {'$gte': start_utc, '$lt': end_utc}
+        except Exception:
+            pass
+    # If no date/range params, export all logs.
+
+    logs = list(db.device_logs.find(query).sort('timestamp', 1))
     output = io.StringIO()
     writer = csv.writer(output)
-    # Write header
     writer.writerow(['User', 'Device', 'Action', 'Result', 'Timestamp'])
-    # Write data rows
     for log in logs:
+        ts = log.get('timestamp', '')
+        if isinstance(ts, datetime):
+            ts_str = ts.astimezone(irl).strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            ts_str = str(ts)
         writer.writerow([
             log.get('user', ''),
             log.get('device', ''),
             log.get('action', ''),
             log.get('result', ''),
-            log.get('timestamp', '')
+            ts_str
         ])
     output.seek(0)
+    if not logs:
+        return jsonify({"error": "No logs found for the selected date or range."}), 404
+
     return Response(output.getvalue(),
                     mimetype="text/csv",
                     headers={"Content-Disposition": "attachment;filename=techhome_usage_logs.csv"})
