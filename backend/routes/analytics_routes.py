@@ -11,20 +11,38 @@ import io
 analytics_routes = Blueprint('analytics_routes', __name__)
 
 def get_date_range():
-    """Return (start, end) datetimes for a given YYYY-MM-DD in UTC, or None if no filter."""
+    """
+    Return (start, end) datetimes in UTC for a single date or a start/end range.
+    - If both startDate and endDate (YYYY-MM-DD) are provided, use as range (inclusive of start, exclusive of end+1).
+    - If only date is provided, use that single day.
+    - Returns UTC-aware datetimes.
+    """
+    irl = timezone('Europe/Dublin')
+    start_date_str = request.args.get('startDate')
+    end_date_str = request.args.get('endDate')
     date_str = request.args.get('date')
-    if not date_str:
-        return None, None
+
     try:
-        irl = timezone('Europe/Dublin')
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
-        start_irl = irl.localize(dt.replace(hour=0, minute=0, second=0, microsecond=0))
-        end_irl = start_irl + timedelta(days=1)
-        # Convert to UTC for DB filtering
-        start_utc = start_irl.astimezone(utc)
-        end_utc = end_irl.astimezone(utc)
-        return start_utc, end_utc
-    except Exception:
+        if start_date_str and end_date_str:
+            start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date_str, "%Y-%m-%d")
+            start_irl = irl.localize(start_dt.replace(hour=0, minute=0, second=0, microsecond=0))
+            end_irl = irl.localize(end_dt.replace(hour=0, minute=0, second=0, microsecond=0)) + timedelta(days=1)
+            # End is exclusive, so add a day to cover the last day fully
+            start_utc = start_irl.astimezone(utc)
+            end_utc = end_irl.astimezone(utc)
+            return start_utc, end_utc
+        elif date_str:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            start_irl = irl.localize(dt.replace(hour=0, minute=0, second=0, microsecond=0))
+            end_irl = start_irl + timedelta(days=1)
+            start_utc = start_irl.astimezone(utc)
+            end_utc = end_irl.astimezone(utc)
+            return start_utc, end_utc
+        else:
+            return None, None
+    except Exception as e:
+        print("[get_date_range] Date parse error:", e)
         return None, None
 
 # Usage Per User
@@ -247,9 +265,32 @@ def usage_per_hour():
 @analytics_routes.route('/actions-in-hour/<int:hour>', methods=['GET'])
 def actions_in_hour(hour):
     irl = timezone('Europe/Dublin')
+    start_date_str = request.args.get('startDate')
+    end_date_str = request.args.get('endDate')
     date_str = request.args.get('date')
-
-    if date_str:
+    logs = []
+    if start_date_str and end_date_str:
+        try:
+            start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date_str, "%Y-%m-%d")
+            for n in range((end_dt - start_dt).days + 1):
+                dt = start_dt + timedelta(days=n)
+                start_local = irl.localize(dt.replace(hour=0, minute=0, second=0, microsecond=0))
+                end_local = start_local + timedelta(days=1)
+                start_utc = start_local.astimezone(utc)
+                end_utc = end_local.astimezone(utc)
+                day_logs = list(db.device_logs.find({
+                    "timestamp": {"$gte": start_utc, "$lt": end_utc}
+                }).sort("timestamp", 1))
+                day_logs = [
+                    log for log in day_logs
+                    if log.get("timestamp") and log["timestamp"].astimezone(irl).hour == hour
+                ]
+                logs.extend(day_logs)
+        except Exception as e:
+            print("[actions-in-hour] Date range parse error:", e)
+            logs = []
+    elif date_str:
         try:
             dt = datetime.strptime(date_str, "%Y-%m-%d")
             start_local = irl.localize(dt.replace(hour=0, minute=0, second=0, microsecond=0))
@@ -261,8 +302,7 @@ def actions_in_hour(hour):
             }).sort("timestamp", 1))
             logs = [
                 log for log in logs
-                if log.get("timestamp") and
-                log["timestamp"].astimezone(irl).hour == hour
+                if log.get("timestamp") and log["timestamp"].astimezone(irl).hour == hour
             ]
         except Exception as e:
             print("[actions-in-hour] Date parse error:", e)
@@ -278,8 +318,7 @@ def actions_in_hour(hour):
         }).sort("timestamp", 1))
         logs = [
             log for log in logs
-            if log.get("timestamp") and
-            log["timestamp"].astimezone(irl).hour == hour
+            if log.get("timestamp") and log["timestamp"].astimezone(irl).hour == hour
         ]
 
     object_ids = set()
@@ -302,7 +341,7 @@ def actions_in_hour(hour):
         all_devices = []
     device_lookup = {}
     for d in all_devices:
-        device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]));
+        device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
         if "entityId" in d:
             device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
 
@@ -311,13 +350,15 @@ def actions_in_hour(hour):
         return device_lookup.get(dev_id, dev_id)
 
     def serialize(log):
+        ts = log.get("timestamp")
         return {
             "user": log.get("user", "unknown"),
             "device": log.get("device", ""),
             "device_name": get_friendly_name(log),
             "action": log.get("action", ""),
             "result": log.get("result", ""),
-            "timestamp": log.get("timestamp").isoformat() if log.get("timestamp") else "",
+            "timestamp": ts.isoformat() if ts else "",
+            "date": ts.astimezone(irl).strftime("%Y-%m-%d") if ts else ""
         }
     return jsonify([serialize(l) for l in logs])
 

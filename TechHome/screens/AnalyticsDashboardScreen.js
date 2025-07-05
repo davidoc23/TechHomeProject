@@ -11,9 +11,13 @@ function formatDate(date) {
 }
 
 export default function AnalyticsDashboardScreen() {
-  // Date filter states
-  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
-  const [appliedDate, setAppliedDate] = useState(formatDate(new Date()));
+  // Date range filter state
+  const [startDate, setStartDate] = useState(formatDate(new Date()));
+  const [endDate, setEndDate] = useState(formatDate(new Date()));
+  const [appliedRange, setAppliedRange] = useState({
+    start: formatDate(new Date()),
+    end: formatDate(new Date()),
+  });
 
   const [deviceUsage, setDeviceUsage] = useState([]);
   const [userUsage, setUserUsage] = useState([]);
@@ -35,12 +39,15 @@ export default function AnalyticsDashboardScreen() {
   // No logs modal state
   const [showNoLogsModal, setShowNoLogsModal] = useState(false);
 
-  // Helper: build query string
+  // Helper: build query string for range
   function dateQuery() {
-    return appliedDate ? `?date=${appliedDate}` : '';
+    if (appliedRange.start === appliedRange.end) {
+      return `?date=${appliedRange.start}`;
+    }
+    return `?startDate=${appliedRange.start}&endDate=${appliedRange.end}`;
   }
 
-  // Fetch all analytics data when date changes
+  // Fetch analytics when range changes
   useEffect(() => {
     setLoadingDevices(true); setLoadingUsers(true); setLoadingFeed(true); setLoadingHourly(true);
     fetch(`http://localhost:5000/api/analytics/usage-per-device${dateQuery()}`)
@@ -55,23 +62,21 @@ export default function AnalyticsDashboardScreen() {
     fetch(`http://localhost:5000/api/analytics/usage-per-hour${dateQuery()}`)
       .then(res => res.json()).then(data => { setHourlyUsage(data); setLoadingHourly(false); })
       .catch(() => setLoadingHourly(false));
-  }, [appliedDate]);
+  }, [appliedRange]);
 
-  // Periodically refresh data every 5 minutes (for the currently applied date)
+  // Periodic auto-refresh
   useEffect(() => {
     const interval = setInterval(() => {
-      setAppliedDate(prev => prev); // Triggers useEffect to fetch latest data for current date
-    }, 5 * 60 * 1000); // 5 minutes
+      setAppliedRange(prev => ({ ...prev }));
+    }, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
   // Drill-down by hour
   const handleHourPress = (hourIdx) => {
-    // console.log('Hour pressed:', hourIdx); // Debug log
     setSelectedHour(hourIdx);
     setShowHourModal(true);
     setLoadingHourActions(true);
-    // Pass date to actions-in-hour endpoint!
     fetch(`http://localhost:5000/api/analytics/actions-in-hour/${hourIdx}${dateQuery()}`)
       .then(res => res.json())
       .then(data => { setHourActions(data); setLoadingHourActions(false); })
@@ -114,7 +119,6 @@ export default function AnalyticsDashboardScreen() {
     }]
   };
 
-  // Show or hide no logs modal based on feed loading and data presence
   useEffect(() => {
     if (!loadingFeed && recentActions.length === 0) {
       setShowNoLogsModal(true);
@@ -123,20 +127,37 @@ export default function AnalyticsDashboardScreen() {
     }
   }, [loadingFeed, recentActions]);
 
+  // Range display helper
+  const rangeDisplay = appliedRange.start === appliedRange.end
+    ? appliedRange.start
+    : `${appliedRange.start} – ${appliedRange.end}`;
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Date Picker */}
+      {/* Date Range Picker */}
       <View style={{
         flexDirection: 'row', alignItems: 'center', margin: 16,
-        marginBottom: 0, marginTop: 24
+        marginBottom: 0, marginTop: 24, flexWrap: 'wrap'
       }}>
-        <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>Date:</Text>
-        {/* For web - use <input type="date" /> */}
+        <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>Start:</Text>
         <input
           type="date"
-          value={selectedDate}
+          value={startDate}
+          max={endDate}
+          onChange={e => setStartDate(e.target.value)}
+          style={{
+            border: `1px solid ${theme.border}`,
+            borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12,
+            background: theme.cardBackground, color: theme.text
+          }}
+        />
+        <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>End:</Text>
+        <input
+          type="date"
+          value={endDate}
+          min={startDate}
           max={formatDate(new Date())}
-          onChange={e => setSelectedDate(e.target.value)}
+          onChange={e => setEndDate(e.target.value)}
           style={{
             border: `1px solid ${theme.border}`,
             borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12,
@@ -144,7 +165,7 @@ export default function AnalyticsDashboardScreen() {
           }}
         />
         <TouchableOpacity
-          onPress={() => setAppliedDate(selectedDate)}
+          onPress={() => setAppliedRange({ start: startDate, end: endDate })}
           style={{
             backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
           }}>
@@ -152,8 +173,10 @@ export default function AnalyticsDashboardScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => {
-            setSelectedDate(formatDate(new Date()));
-            setAppliedDate(formatDate(new Date())); 
+            const today = formatDate(new Date());
+            setStartDate(today);
+            setEndDate(today);
+            setAppliedRange({ start: today, end: today });
           }}
           style={{
             backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
@@ -162,16 +185,15 @@ export default function AnalyticsDashboardScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           onPress={async () => {
-            const url = `http://localhost:5000/api/analytics/export-usage-csv?date=${appliedDate}`;
+            const url = `http://localhost:5000/api/analytics/export-usage-csv${dateQuery()}`;
             try {
               const response = await fetch(url);
               const contentType = response.headers.get('content-type');
               if (response.status === 404 || (contentType && contentType.includes('application/json'))) {
                 const data = await response.json();
-                Alert.alert('No Data', data.error || 'No logs found for the selected date.');
+                Alert.alert('No Data', data.error || 'No logs found for the selected range.');
                 return;
               }
-              // If CSV, trigger download
               if (typeof window !== 'undefined' && window.URL) {
                 const blob = await response.blob();
                 const downloadUrl = window.URL.createObjectURL(blob);
@@ -200,8 +222,13 @@ export default function AnalyticsDashboardScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Range Display */}
+      <Text style={{ fontWeight: 'bold', fontSize: 16, color: theme.text, marginLeft: 16, marginTop: 4 }}>
+        Viewing: {rangeDisplay}
+      </Text>
+
       {/* Recent Activity Feed */}
-      <View style={{ flex: 1, backgroundColor: theme.cardBackground, borderRadius: 16, marginHorizontal: 15, marginTop: 32, padding: 4, marginBottom: 32, paddingBottom: 45, minHeight: 300}}>
+      <View style={{ flex: 1, backgroundColor: theme.cardBackground, borderRadius: 16, marginHorizontal: 15, marginTop: 32, padding: 4, marginBottom: 32, paddingBottom: 45, minHeight: 300 }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold', marginLeft: 8, marginTop: 8, color: theme.text, marginHorizontal: 14 }}>
           Recent Activity Feed
         </Text>
@@ -217,8 +244,8 @@ export default function AnalyticsDashboardScreen() {
                 style={{
                   borderBottomWidth: i === arr.length - 1 ? 0 : 1,
                   borderBottomColor: theme.border,
-                  marginHorizontal: 14,     
-                  marginBottom: 12,          
+                  marginHorizontal: 14,
+                  marginBottom: 12,
                   paddingVertical: 14,
                   paddingHorizontal: 12,
                   marginHorizontal: 4,
@@ -258,7 +285,7 @@ export default function AnalyticsDashboardScreen() {
                     <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>
                       {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
                     </Text>
-                  </View> 
+                  </View>
                 )}
               </View>
             ))}
@@ -378,7 +405,7 @@ export default function AnalyticsDashboardScreen() {
             elevation: 4
           }}>
             <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8, color: theme.text }}>
-              Activity in Hour {selectedHour !== null ? `${selectedHour.toString().padStart(2, '0')}:00-${selectedHour.toString().padStart(2, '0')}:59` : ''} ({appliedDate})
+              Activity in Hour {selectedHour !== null ? `${selectedHour.toString().padStart(2, '0')}:00-${selectedHour.toString().padStart(2, '0')}:59` : ''} ({rangeDisplay})
             </Text>
             {loadingHourActions ? (
               <Text style={{ color: theme.text }}>Loading...</Text>
@@ -395,7 +422,7 @@ export default function AnalyticsDashboardScreen() {
                       {" "}<Text style={{ color: theme.textTertiary }}>{item.result}</Text>
                     </Text>
                     <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                      {item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : ''}
+                      {item.date ? `${item.date} ` : ''}{item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : ''}
                     </Text>
                   </View>
                 ))}
@@ -433,7 +460,7 @@ export default function AnalyticsDashboardScreen() {
               No logs found for this date
             </Text>
             <Text style={{ color: theme.textSecondary, marginBottom: 18, textAlign: 'center' }}>
-              There are no activity logs for the selected date.
+              There are no activity logs for the selected date or date range.
             </Text>
             <TouchableOpacity
               onPress={() => setShowNoLogsModal(false)}
