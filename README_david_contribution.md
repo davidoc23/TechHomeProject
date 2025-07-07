@@ -46,6 +46,7 @@ This file details my individual contributions to the TechHomeProject Final Year 
     - **CSV Export Functionality:** Users and admins can now export/download usage logs as CSV files for offline review, audits, or external reporting.
     - **No Logs Modal:** A modal now displays clearly when no logs are found for a selected date/filter, improving user feedback.
     - **Manual and Auto-Refresh:** Added a manual Refresh button to immediately reload analytics for today. The dashboard auto-refreshes every 5 minutes for up-to-date data without user action.
+    - **User Filtering:** Added a user filter dropdown and "Apply User" button to the analytics dashboard, allowing filtering of all analytics, charts, activity feed, hourly modal, and CSV export by user or all users. Backend endpoints were updated to support a `user` query parameter for all analytics and export routes. The user filter UI is positioned on the right for improved layout.
 
 - **Automated Testing**
   - Authored the entire backend test suite (`tests/`), including:
