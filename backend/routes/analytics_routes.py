@@ -45,6 +45,14 @@ def get_date_range():
         print("[get_date_range] Date parse error:", e)
         return None, None
 
+# Users List Endpoint
+@analytics_routes.route('/users', methods=['GET'])
+def get_users():
+    users = db.device_logs.distinct('user')
+    users = [u for u in users if u and u.strip()]
+    users.sort()
+    return jsonify(users)
+
 # Usage Per User
 @analytics_routes.route('/usage-per-user', methods=['GET'])
 def usage_per_user():
@@ -52,6 +60,9 @@ def usage_per_user():
     match = {}
     if start and end:
         match["timestamp"] = {"$gte": start, "$lt": end}
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        match["user"] = user
     pipeline = []
     if match:
         pipeline.append({"$match": match})
@@ -70,6 +81,9 @@ def usage_per_device():
     match = {}
     if start and end:
         match["timestamp"] = {"$gte": start, "$lt": end}
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        match["user"] = user
     pipeline = []
     if match:
         pipeline.append({"$match": match})
@@ -178,6 +192,9 @@ def recent_actions():
     q = {}
     if start and end:
         q["timestamp"] = {"$gte": start, "$lt": end}
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        q["user"] = user
     logs = list(db.device_logs.find(q).sort("timestamp", -1).limit(20))
     object_ids = set()
     entity_ids = set()
@@ -251,6 +268,9 @@ def usage_per_hour():
     q = {}
     if start and end:
         q["timestamp"] = {"$gte": start, "$lt": end}
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        q["user"] = user
     logs = list(db.device_logs.find(q))
     hour_counts = [0] * 24
     for log in logs:
@@ -268,7 +288,12 @@ def actions_in_hour(hour):
     start_date_str = request.args.get('startDate')
     end_date_str = request.args.get('endDate')
     date_str = request.args.get('date')
+    user = request.args.get('user')
     logs = []
+    def add_user_filter(q):
+        if user and user != 'ALL':
+            q['user'] = user
+        return q
     if start_date_str and end_date_str:
         try:
             start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
@@ -279,9 +304,9 @@ def actions_in_hour(hour):
                 end_local = start_local + timedelta(days=1)
                 start_utc = start_local.astimezone(utc)
                 end_utc = end_local.astimezone(utc)
-                day_logs = list(db.device_logs.find({
-                    "timestamp": {"$gte": start_utc, "$lt": end_utc}
-                }).sort("timestamp", 1))
+                q = {"timestamp": {"$gte": start_utc, "$lt": end_utc}}
+                q = add_user_filter(q)
+                day_logs = list(db.device_logs.find(q).sort("timestamp", 1))
                 day_logs = [
                     log for log in day_logs
                     if log.get("timestamp") and log["timestamp"].astimezone(irl).hour == hour
@@ -297,9 +322,9 @@ def actions_in_hour(hour):
             end_local = start_local + timedelta(days=1)
             start_utc = start_local.astimezone(utc)
             end_utc = end_local.astimezone(utc)
-            logs = list(db.device_logs.find({
-                "timestamp": {"$gte": start_utc, "$lt": end_utc}
-            }).sort("timestamp", 1))
+            q = {"timestamp": {"$gte": start_utc, "$lt": end_utc}}
+            q = add_user_filter(q)
+            logs = list(db.device_logs.find(q).sort("timestamp", 1))
             logs = [
                 log for log in logs
                 if log.get("timestamp") and log["timestamp"].astimezone(irl).hour == hour
@@ -313,9 +338,9 @@ def actions_in_hour(hour):
         end_local = start_local + timedelta(days=1)
         start_utc = start_local.astimezone(utc)
         end_utc = end_local.astimezone(utc)
-        logs = list(db.device_logs.find({
-            "timestamp": {"$gte": start_utc, "$lt": end_utc}
-        }).sort("timestamp", 1))
+        q = {"timestamp": {"$gte": start_utc, "$lt": end_utc}}
+        q = add_user_filter(q)
+        logs = list(db.device_logs.find(q).sort("timestamp", 1))
         logs = [
             log for log in logs
             if log.get("timestamp") and log["timestamp"].astimezone(irl).hour == hour
@@ -368,6 +393,7 @@ def export_usage_csv():
     date_str = request.args.get('date')
     start_date_str = request.args.get('startDate')
     end_date_str = request.args.get('endDate')
+    user = request.args.get('user')
     irl = timezone('Europe/Dublin')
     query = {}
 
@@ -389,6 +415,10 @@ def export_usage_csv():
         except Exception:
             pass
     # If no date/range params, export all logs.
+
+    # Apply user filter if present
+    if user and user != 'ALL':
+        query['user'] = user
 
     logs = list(db.device_logs.find(query).sort('timestamp', 1))
     output = io.StringIO()

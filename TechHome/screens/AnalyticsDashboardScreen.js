@@ -39,15 +39,32 @@ export default function AnalyticsDashboardScreen() {
   // No logs modal state
   const [showNoLogsModal, setShowNoLogsModal] = useState(false);
 
-  // Helper: build query string for range
+  // User filter states
+  const [users, setUsers] = useState([]); // List of users for dropdown
+  const [selectedUser, setSelectedUser] = useState('ALL'); // all users
+  const [appliedUser, setAppliedUser] = useState('ALL'); // Applied filter
+
+  // Helper: build query string for range and user
   function dateQuery() {
+    let query = '';
     if (appliedRange.start === appliedRange.end) {
-      return `?date=${appliedRange.start}`;
+      query += `?date=${appliedRange.start}`;
+    } else {
+      query += `?startDate=${appliedRange.start}&endDate=${appliedRange.end}`;
     }
-    return `?startDate=${appliedRange.start}&endDate=${appliedRange.end}`;
+    if (appliedUser && appliedUser !== 'ALL') query += `&user=${encodeURIComponent(appliedUser)}`;
+    return query;
   }
 
-  // Fetch analytics when range changes
+  // Fetch users for filter dropdown
+  useEffect(() => {
+    fetch('http://localhost:5000/api/analytics/users')
+      .then(res => res.json())
+      .then(data => setUsers(data))
+      .catch(() => setUsers([]));
+  }, []);
+
+  // Fetch analytics when range or user changes
   useEffect(() => {
     setLoadingDevices(true); setLoadingUsers(true); setLoadingFeed(true); setLoadingHourly(true);
     fetch(`http://localhost:5000/api/analytics/usage-per-device${dateQuery()}`)
@@ -62,7 +79,7 @@ export default function AnalyticsDashboardScreen() {
     fetch(`http://localhost:5000/api/analytics/usage-per-hour${dateQuery()}`)
       .then(res => res.json()).then(data => { setHourlyUsage(data); setLoadingHourly(false); })
       .catch(() => setLoadingHourly(false));
-  }, [appliedRange]);
+  }, [appliedRange, appliedUser]);
 
   // Periodic auto-refresh
   useEffect(() => {
@@ -134,97 +151,119 @@ export default function AnalyticsDashboardScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Date Range Picker */}
+      {/* Date Range & User Filter Row */}
       <View style={{
         flexDirection: 'row', alignItems: 'center', margin: 16,
-        marginBottom: 0, marginTop: 24, flexWrap: 'wrap'
+        marginBottom: 0, marginTop: 24, flexWrap: 'wrap', justifyContent: 'space-between'
       }}>
-        <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>Start:</Text>
-        <input
-          type="date"
-          value={startDate}
-          max={endDate}
-          onChange={e => setStartDate(e.target.value)}
-          style={{
-            border: `1px solid ${theme.border}`,
-            borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12,
-            background: theme.cardBackground, color: theme.text
-          }}
-        />
-        <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>End:</Text>
-        <input
-          type="date"
-          value={endDate}
-          min={startDate}
-          max={formatDate(new Date())}
-          onChange={e => setEndDate(e.target.value)}
-          style={{
-            border: `1px solid ${theme.border}`,
-            borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12,
-            background: theme.cardBackground, color: theme.text
-          }}
-        />
-        <TouchableOpacity
-          onPress={() => setAppliedRange({ start: startDate, end: endDate })}
-          style={{
-            backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
-          }}>
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Apply</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            const today = formatDate(new Date());
-            setStartDate(today);
-            setEndDate(today);
-            setAppliedRange({ start: today, end: today });
-          }}
-          style={{
-            backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
-          }}>
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Refresh</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={async () => {
-            const url = `http://localhost:5000/api/analytics/export-usage-csv${dateQuery()}`;
-            try {
-              const response = await fetch(url);
-              const contentType = response.headers.get('content-type');
-              if (response.status === 404 || (contentType && contentType.includes('application/json'))) {
-                const data = await response.json();
-                setShowNoLogsModal(true); // Show modal instead of Alert
-                return;
+        {/* Date controls */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
+          <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>Start:</Text>
+          <input
+            type="date"
+            value={startDate}
+            max={endDate}
+            onChange={e => setStartDate(e.target.value)}
+            style={{
+              border: `1px solid ${theme.border}`,
+              borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12,
+              background: theme.cardBackground, color: theme.text
+            }}
+          />
+          <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>End:</Text>
+          <input
+            type="date"
+            value={endDate}
+            min={startDate}
+            max={formatDate(new Date())}
+            onChange={e => setEndDate(e.target.value)}
+            style={{
+              border: `1px solid ${theme.border}`,
+              borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12,
+              background: theme.cardBackground, color: theme.text
+            }}
+          />
+          <TouchableOpacity
+            onPress={() => setAppliedRange({ start: startDate, end: endDate })}
+            style={{
+              backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
+            }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Apply</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              const today = formatDate(new Date());
+              setStartDate(today);
+              setEndDate(today);
+              setAppliedRange({ start: today, end: today });
+            }}
+            style={{
+              backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
+            }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Refresh</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={async () => {
+              const url = `http://localhost:5000/api/analytics/export-usage-csv${dateQuery()}`;
+              try {
+                const response = await fetch(url);
+                const contentType = response.headers.get('content-type');
+                if (response.status === 404 || (contentType && contentType.includes('application/json'))) {
+                  const data = await response.json();
+                  setShowNoLogsModal(true); // Show modal instead of Alert
+                  return;
+                }
+                if (typeof window !== 'undefined' && window.URL) {
+                  const blob = await response.blob();
+                  const downloadUrl = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = downloadUrl;
+                  a.download = 'techhome_usage_logs.csv';
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  window.URL.revokeObjectURL(downloadUrl);
+                } else {
+                  Linking.openURL(url);
+                }
+              } catch (err) {
+                setShowNoLogsModal(true); // Show modal on error as well
               }
-              if (typeof window !== 'undefined' && window.URL) {
-                const blob = await response.blob();
-                const downloadUrl = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = downloadUrl;
-                a.download = 'techhome_usage_logs.csv';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(downloadUrl);
-              } else {
-                Linking.openURL(url);
-              }
-            } catch (err) {
-              setShowNoLogsModal(true); // Show modal on error as well
-            }
-          }}
-          style={{
-            backgroundColor: theme.primary,
-            borderRadius: 4,
-            paddingVertical: 6,
-            paddingHorizontal: 14
-          }}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Export as CSV</Text>
-        </TouchableOpacity>
+            }}
+            style={{
+              backgroundColor: theme.primary,
+              borderRadius: 4,
+              paddingVertical: 6,
+              paddingHorizontal: 14
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Export as CSV</Text>
+          </TouchableOpacity>
+        </View>
+        {/* User controls */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 16 }}>
+          <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>User:</Text>
+          <select
+            value={selectedUser}
+            onChange={e => setSelectedUser(e.target.value)}
+            style={{ border: `1px solid ${theme.border}`, borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12, background: theme.cardBackground, color: theme.text }}
+          >
+            <option value="ALL">All Users</option>
+            {users.map((u, i) => (
+              <option key={i} value={u}>{u}</option>  
+            ))}
+          </select>
+          <TouchableOpacity
+            onPress={() => setAppliedUser(selectedUser)}
+            style={{ backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8 }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Apply User</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Range Display */}
       <Text style={{ fontWeight: 'bold', fontSize: 16, color: theme.text, marginLeft: 16, marginTop: 4 }}>
-        Viewing: {rangeDisplay}
+        Viewing: {rangeDisplay} as {selectedUser}
       </Text>
 
       {/* Recent Activity Feed */}
