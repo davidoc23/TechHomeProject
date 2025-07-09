@@ -44,7 +44,17 @@ export default function AnalyticsDashboardScreen() {
   const [selectedUser, setSelectedUser] = useState('ALL'); // all users
   const [appliedUser, setAppliedUser] = useState('ALL'); // Applied filter
 
-  // Helper: build query string for range and user
+  // Device filter states
+  const [devices, setDevices] = useState([]); // List of devices for dropdown
+  const [selectedDevice, setSelectedDevice] = useState('ALL'); // all devices
+  const [appliedDevice, setAppliedDevice] = useState('ALL'); // Applied filter
+
+  // Room filter states
+  const [rooms, setRooms] = useState([]); // List of rooms for dropdown
+  const [selectedRoom, setSelectedRoom] = useState('ALL'); // all rooms
+  const [appliedRoom, setAppliedRoom] = useState('ALL'); // Applied filter
+
+  // Helper: build query string for range, user, device, and room
   function dateQuery() {
     let query = '';
     if (appliedRange.start === appliedRange.end) {
@@ -53,6 +63,8 @@ export default function AnalyticsDashboardScreen() {
       query += `?startDate=${appliedRange.start}&endDate=${appliedRange.end}`;
     }
     if (appliedUser && appliedUser !== 'ALL') query += `&user=${encodeURIComponent(appliedUser)}`;
+    if (appliedDevice && appliedDevice !== 'ALL') query += `&device=${encodeURIComponent(appliedDevice)}`;
+    if (appliedRoom && appliedRoom !== 'ALL') query += `&room=${encodeURIComponent(appliedRoom)}`;
     return query;
   }
 
@@ -62,6 +74,22 @@ export default function AnalyticsDashboardScreen() {
       .then(res => res.json())
       .then(data => setUsers(data))
       .catch(() => setUsers([]));
+  }, []);
+
+  // Fetch devices for filter dropdown
+  useEffect(() => {
+    fetch('http://localhost:5000/api/analytics/devices')
+      .then(res => res.json())
+      .then(data => setDevices(data))
+      .catch(() => setDevices([]));
+  }, []);
+
+  // Fetch rooms for filter dropdown
+  useEffect(() => {
+    fetch('http://localhost:5000/api/analytics/rooms')
+      .then(res => res.json())
+      .then(data => setRooms(data))
+      .catch(() => setRooms([]));
   }, []);
 
   // Fetch analytics when range or user changes
@@ -79,7 +107,7 @@ export default function AnalyticsDashboardScreen() {
     fetch(`http://localhost:5000/api/analytics/usage-per-hour${dateQuery()}`)
       .then(res => res.json()).then(data => { setHourlyUsage(data); setLoadingHourly(false); })
       .catch(() => setLoadingHourly(false));
-  }, [appliedRange, appliedUser]);
+  }, [appliedRange, appliedUser, appliedDevice, appliedRoom]);
 
   // Periodic auto-refresh
   useEffect(() => {
@@ -148,6 +176,21 @@ export default function AnalyticsDashboardScreen() {
   const rangeDisplay = appliedRange.start === appliedRange.end
     ? appliedRange.start
     : `${appliedRange.start} – ${appliedRange.end}`;
+  
+  // Filter display helper
+  const getFilterDisplay = () => {
+    let filters = [];
+    if (appliedUser !== 'ALL') filters.push(`User: ${appliedUser}`);
+    if (appliedDevice !== 'ALL') {
+      const deviceName = devices.find(d => d.id === appliedDevice)?.name || appliedDevice;
+      filters.push(`Device: ${deviceName}`);
+    }
+    if (appliedRoom !== 'ALL') {
+      const roomName = rooms.find(r => r.id === appliedRoom)?.name || appliedRoom;
+      filters.push(`Room: ${roomName}`);
+    }
+    return filters.length > 0 ? ` (${filters.join(', ')})` : '';
+  };
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
@@ -196,6 +239,13 @@ export default function AnalyticsDashboardScreen() {
               setStartDate(today);
               setEndDate(today);
               setAppliedRange({ start: today, end: today });
+              // Reset all filters to default
+              setSelectedUser('ALL');
+              setAppliedUser('ALL');
+              setSelectedDevice('ALL');
+              setAppliedDevice('ALL');
+              setSelectedRoom('ALL');
+              setAppliedRoom('ALL');
             }}
             style={{
               backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
@@ -240,30 +290,223 @@ export default function AnalyticsDashboardScreen() {
             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Export as CSV</Text>
           </TouchableOpacity>
         </View>
-        {/* User controls */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 16 }}>
-          <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>User:</Text>
-          <select
-            value={selectedUser}
-            onChange={e => setSelectedUser(e.target.value)}
-            style={{ border: `1px solid ${theme.border}`, borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12, background: theme.cardBackground, color: theme.text }}
-          >
-            <option value="ALL">All Users</option>
-            {users.map((u, i) => (
-              <option key={i} value={u}>{u}</option>  
-            ))}
-          </select>
+      </View>
+
+      {/* Filter Controls Row */}
+      <View style={{
+        backgroundColor: theme.cardBackground,
+        borderRadius: 12,
+        margin: 16,
+        marginTop: 8,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+      }}>
+        <Text style={{ 
+          fontSize: 18, 
+          fontWeight: 'bold', 
+          color: theme.text, 
+          marginBottom: 16,
+          textAlign: 'center'
+        }}>
+          Filters
+        </Text>
+        
+        {/* Filters in a grid layout */}
+        <View style={{ 
+          flexDirection: 'row', 
+          flexWrap: 'wrap', 
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          {/* User Filter */}
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            marginBottom: 12,
+            backgroundColor: theme.background,
+            borderRadius: 8,
+            padding: 8,
+            minWidth: '30%',
+            flex: 1,
+            marginRight: 8
+          }}>
+            <Text style={{ fontWeight: '600', marginRight: 8, color: theme.text, fontSize: 14 }}>User:</Text>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+              <select
+                value={selectedUser}
+                onChange={e => setSelectedUser(e.target.value)}
+                style={{ 
+                  border: `1px solid ${theme.border}`, 
+                  borderRadius: 6, 
+                  padding: 6, 
+                  fontSize: 14, 
+                  marginRight: 8,
+                  background: theme.cardBackground, 
+                  color: theme.text,
+                  flex: 1,
+                  minWidth: 80
+                }}
+              >
+                <option value="ALL">All Users</option>
+                {users.map((u, i) => (
+                  <option key={i} value={u}>{u}</option>  
+                ))}
+              </select>
+              <TouchableOpacity
+                onPress={() => setAppliedUser(selectedUser)}
+                style={{ 
+                  backgroundColor: theme.primary, 
+                  borderRadius: 6, 
+                  paddingVertical: 4, 
+                  paddingHorizontal: 8 
+                }}>
+                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12 }}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Device Filter */}
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            marginBottom: 12,
+            backgroundColor: theme.background,
+            borderRadius: 8,
+            padding: 8,
+            minWidth: '30%',
+            flex: 1,
+            marginRight: 8
+          }}>
+            <Text style={{ fontWeight: '600', marginRight: 8, color: theme.text, fontSize: 14 }}>Device:</Text>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+              <select
+                value={selectedDevice}
+                onChange={e => setSelectedDevice(e.target.value)}
+                style={{ 
+                  border: `1px solid ${theme.border}`, 
+                  borderRadius: 6, 
+                  padding: 6, 
+                  fontSize: 14, 
+                  marginRight: 8,
+                  background: theme.cardBackground, 
+                  color: theme.text,
+                  flex: 1,
+                  minWidth: 80
+                }}
+              >
+                <option value="ALL">All Devices</option>
+                {devices.map((d, i) => (
+                  <option key={i} value={d.id}>{d.name}</option>  
+                ))}
+              </select>
+              <TouchableOpacity
+                onPress={() => {
+                  setAppliedDevice(selectedDevice);
+                  // Clear room filter when device is selected
+                  if (selectedDevice !== 'ALL') {
+                    setSelectedRoom('ALL');
+                    setAppliedRoom('ALL');
+                  }
+                }}
+                style={{ 
+                  backgroundColor: theme.primary, 
+                  borderRadius: 6, 
+                  paddingVertical: 4, 
+                  paddingHorizontal: 8 
+                }}>
+                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12 }}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Room Filter */}
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            marginBottom: 12,
+            backgroundColor: theme.background,
+            borderRadius: 8,
+            padding: 8,
+            minWidth: '30%',
+            flex: 1
+          }}>
+            <Text style={{ fontWeight: '600', marginRight: 8, color: theme.text, fontSize: 14 }}>Room:</Text>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+              <select
+                value={selectedRoom}
+                onChange={e => setSelectedRoom(e.target.value)}
+                style={{ 
+                  border: `1px solid ${theme.border}`, 
+                  borderRadius: 6, 
+                  padding: 6, 
+                  fontSize: 14, 
+                  marginRight: 8,
+                  background: theme.cardBackground, 
+                  color: theme.text,
+                  flex: 1,
+                  minWidth: 80
+                }}
+              >
+                <option value="ALL">All Rooms</option>
+                {rooms.map((r, i) => (
+                  <option key={i} value={r.id}>{r.name}</option>  
+                ))}
+              </select>
+              <TouchableOpacity
+                onPress={() => {
+                  setAppliedRoom(selectedRoom);
+                  // Clear device filter when room is selected
+                  if (selectedRoom !== 'ALL') {
+                    setSelectedDevice('ALL');
+                    setAppliedDevice('ALL');
+                  }
+                }}
+                style={{ 
+                  backgroundColor: theme.primary, 
+                  borderRadius: 6, 
+                  paddingVertical: 4, 
+                  paddingHorizontal: 8 
+                }}>
+                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12 }}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Clear All Filters Button */}
+        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8 }}>
           <TouchableOpacity
-            onPress={() => setAppliedUser(selectedUser)}
-            style={{ backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8 }}>
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Apply User</Text>
+            onPress={() => {
+              setSelectedUser('ALL');
+              setAppliedUser('ALL');
+              setSelectedDevice('ALL');
+              setAppliedDevice('ALL');
+              setSelectedRoom('ALL');
+              setAppliedRoom('ALL');
+            }}
+            style={{ 
+              backgroundColor: theme.danger, 
+              borderRadius: 8, 
+              paddingVertical: 8, 
+              paddingHorizontal: 16,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.2,
+              shadowRadius: 2,
+              elevation: 2,
+            }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>Clear All Filters</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Range Display */}
-      <Text style={{ fontWeight: 'bold', fontSize: 16, color: theme.text, marginLeft: 16, marginTop: 4 }}>
-        Viewing: {rangeDisplay} as {selectedUser}
+      <Text style={{ fontWeight: 'bold', fontSize: 16, color: theme.text, marginLeft: 16, marginTop: 8 }}>
+        Viewing: {rangeDisplay}{getFilterDisplay()}
       </Text>
 
       {/* Recent Activity Feed */}

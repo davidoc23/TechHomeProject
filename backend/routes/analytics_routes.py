@@ -45,6 +45,110 @@ def get_date_range():
         print("[get_date_range] Date parse error:", e)
         return None, None
 
+def apply_device_room_filters(match):
+    """
+    Apply device and room filters to a MongoDB match query.
+    """
+    device = request.args.get('device')
+    room = request.args.get('room')
+    
+    if device and device != 'ALL':
+        # Check if device is an ObjectId or entityId
+        device_ids = [device]
+        
+        # Try to find the device and add both _id and entityId for matching
+        try:
+            if ObjectId.is_valid(device):
+                # If it's a valid ObjectId, find the device and add its entityId too
+                device_doc = db.devices_collection.find_one({"_id": ObjectId(device)})
+                if device_doc and "entityId" in device_doc:
+                    device_ids.append(device_doc["entityId"])
+            else:
+                # If it's an entityId, find the device and add its _id too
+                device_doc = db.devices_collection.find_one({"entityId": device})
+                if device_doc:
+                    device_ids.append(str(device_doc["_id"]))
+        except Exception as e:
+            print("[apply_device_room_filters] Device lookup error:", e)
+        
+        match["device"] = {"$in": device_ids} if len(device_ids) > 1 else device
+        
+    elif room and room != 'ALL':
+        # Get all devices in the specified room
+        try:
+            room_devices = list(db.devices_collection.find({"roomId": ObjectId(room)}))
+            device_ids = []
+            for d in room_devices:
+                device_ids.append(str(d["_id"]))
+                if "entityId" in d:
+                    device_ids.append(d["entityId"])
+            if device_ids:
+                match["device"] = {"$in": device_ids}
+            else:
+                # No devices in room, return empty results
+                match["device"] = {"$in": []}
+        except Exception as e:
+            print("[apply_device_room_filters] Room filter error:", e)
+            match["device"] = {"$in": []}
+    
+    return match
+
+# Devices List Endpoint
+@analytics_routes.route('/devices', methods=['GET'])
+def get_devices():
+    """Get list of all devices for filtering dropdown"""
+    try:
+        devices = list(db.devices_collection.find())
+        device_list = []
+        seen_names = set()  # Track device names to avoid duplicates
+        
+        for d in devices:
+            device_name = d.get("name", str(d["_id"]))
+            
+            # Add device with _id as primary identifier
+            if device_name not in seen_names:
+                device_list.append({
+                    "id": str(d["_id"]),
+                    "name": device_name,
+                    "entityId": d.get("entityId")
+                })
+                seen_names.add(device_name)
+            
+            # Only add entityId as separate entry if it's significantly different and has a different name
+            if "entityId" in d and d["entityId"] != str(d["_id"]):
+                entity_name = d.get("name", d["entityId"])
+                if entity_name not in seen_names and entity_name != device_name:
+                    device_list.append({
+                        "id": d["entityId"],
+                        "name": entity_name,
+                        "entityId": d.get("entityId")
+                    })
+                    seen_names.add(entity_name)
+        
+        # Sort by name for better UX
+        device_list.sort(key=lambda x: x["name"].lower())
+        return jsonify(device_list)
+    except Exception as e:
+        print("[get_devices] Error:", e)
+        return jsonify([])
+
+# Rooms List Endpoint
+@analytics_routes.route('/rooms', methods=['GET'])
+def get_rooms():
+    """Get list of all rooms for filtering dropdown"""
+    try:
+        rooms = list(db.rooms_collection.find())
+        room_list = []
+        for r in rooms:
+            room_list.append({
+                "id": str(r["_id"]),
+                "name": r.get("name", str(r["_id"]))
+            })
+        return jsonify(room_list)
+    except Exception as e:
+        print("[get_rooms] Error:", e)
+        return jsonify([])
+
 # Users List Endpoint
 @analytics_routes.route('/users', methods=['GET'])
 def get_users():
@@ -63,6 +167,8 @@ def usage_per_user():
     user = request.args.get('user')
     if user and user != 'ALL':
         match["user"] = user
+    # Apply device/room filters
+    match = apply_device_room_filters(match)
     pipeline = []
     if match:
         pipeline.append({"$match": match})
@@ -84,6 +190,8 @@ def usage_per_device():
     user = request.args.get('user')
     if user and user != 'ALL':
         match["user"] = user
+    # Apply device/room filters
+    match = apply_device_room_filters(match)
     pipeline = []
     if match:
         pipeline.append({"$match": match})
@@ -195,6 +303,8 @@ def recent_actions():
     user = request.args.get('user')
     if user and user != 'ALL':
         q["user"] = user
+    # Apply device/room filters
+    q = apply_device_room_filters(q)
     logs = list(db.device_logs.find(q).sort("timestamp", -1).limit(20))
     object_ids = set()
     entity_ids = set()
@@ -271,6 +381,8 @@ def usage_per_hour():
     user = request.args.get('user')
     if user and user != 'ALL':
         q["user"] = user
+    # Apply device/room filters
+    q = apply_device_room_filters(q)
     logs = list(db.device_logs.find(q))
     hour_counts = [0] * 24
     for log in logs:
@@ -293,6 +405,8 @@ def actions_in_hour(hour):
     def add_user_filter(q):
         if user and user != 'ALL':
             q['user'] = user
+        # Apply device/room filters
+        q = apply_device_room_filters(q)
         return q
     if start_date_str and end_date_str:
         try:
@@ -419,6 +533,9 @@ def export_usage_csv():
     # Apply user filter if present
     if user and user != 'ALL':
         query['user'] = user
+
+    # Apply device/room filters
+    query = apply_device_room_filters(query)
 
     logs = list(db.device_logs.find(query).sort('timestamp', 1))
     output = io.StringIO()
