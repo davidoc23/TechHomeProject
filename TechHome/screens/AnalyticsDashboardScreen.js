@@ -39,6 +39,9 @@ export default function AnalyticsDashboardScreen() {
   // No logs modal state
   const [showNoLogsModal, setShowNoLogsModal] = useState(false);
 
+  // Filter modal state
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
   // User filter states
   const [users, setUsers] = useState([]); // List of users for dropdown
   const [selectedUser, setSelectedUser] = useState('ALL'); // all users
@@ -172,6 +175,65 @@ export default function AnalyticsDashboardScreen() {
     }
   }, [loadingFeed, recentActions]);
 
+  // Smart message helper for no data scenarios
+  const getNoDataMessage = () => {
+    let title = "No Activity Found";
+    let message = "";
+    let suggestions = [];
+
+    // Check which filters are applied
+    const hasUserFilter = appliedUser !== 'ALL';
+    const hasDeviceFilter = appliedDevice !== 'ALL';
+    const hasRoomFilter = appliedRoom !== 'ALL';
+    const isToday = appliedRange.start === appliedRange.end && appliedRange.start === formatDate(new Date());
+    
+    if (hasDeviceFilter) {
+      const deviceName = devices.find(d => d.id === appliedDevice)?.name || appliedDevice;
+      title = `No Activity for ${deviceName}`;
+      message = `No activity logs found for the device "${deviceName}" during the selected time period.`;
+      suggestions = [
+        "Try selecting a different date range",
+        "Check if the device was active during this period",
+        "Remove the device filter to see all activity"
+      ];
+    } else if (hasRoomFilter) {
+      const roomName = rooms.find(r => r.id === appliedRoom)?.name || appliedRoom;
+      title = `No Activity in ${roomName}`;
+      message = `No activity logs found for devices in the "${roomName}" room during the selected time period.`;
+      suggestions = [
+        "Try selecting a different date range",
+        "Check if any devices in this room were active",
+        "Remove the room filter to see all activity"
+      ];
+    } else if (hasUserFilter) {
+      title = `No Activity for ${appliedUser}`;
+      message = `No activity logs found for user "${appliedUser}" during the selected time period.`;
+      suggestions = [
+        "Try selecting a different date range",
+        "Check if this user was active during this period",
+        "Remove the user filter to see all activity"
+      ];
+    } else if (isToday) {
+      title = "No Activity Today";
+      message = "No activity logs have been recorded for today yet.";
+      suggestions = [
+        "Try selecting yesterday or a previous date",
+        "Check if any devices have been used today",
+        "Activity logs may take a few minutes to appear"
+      ];
+    } else {
+      title = "No Activity Found";
+      message = `No activity logs found for the selected date range (${rangeDisplay}).`;
+      suggestions = [
+        "Try selecting a different date range",
+        "Check if any devices were active during this period",
+        "Verify that device logging is enabled"
+      ];
+    }
+
+    return { title, message, suggestions };
+  };
+
   // Range display helper
   const rangeDisplay = appliedRange.start === appliedRange.end
     ? appliedRange.start
@@ -194,44 +256,27 @@ export default function AnalyticsDashboardScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Date Range & User Filter Row */}
+      {/* Simplified Filter Controls Row */}
       <View style={{
         flexDirection: 'row', alignItems: 'center', margin: 16,
         marginBottom: 0, marginTop: 24, flexWrap: 'wrap', justifyContent: 'space-between'
       }}>
-        {/* Date controls */}
         <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
-          <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>Start:</Text>
-          <input
-            type="date"
-            value={startDate}
-            max={endDate}
-            onChange={e => setStartDate(e.target.value)}
-            style={{
-              border: `1px solid ${theme.border}`,
-              borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12,
-              background: theme.cardBackground, color: theme.text
-            }}
-          />
-          <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text }}>End:</Text>
-          <input
-            type="date"
-            value={endDate}
-            min={startDate}
-            max={formatDate(new Date())}
-            onChange={e => setEndDate(e.target.value)}
-            style={{
-              border: `1px solid ${theme.border}`,
-              borderRadius: 4, padding: 4, fontSize: 16, marginRight: 12,
-              background: theme.cardBackground, color: theme.text
-            }}
-          />
           <TouchableOpacity
-            onPress={() => setAppliedRange({ start: startDate, end: endDate })}
+            onPress={() => setShowFilterModal(true)}
             style={{
-              backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
+              backgroundColor: theme.primary, 
+              borderRadius: 8, 
+              paddingVertical: 10, 
+              paddingHorizontal: 16, 
+              marginRight: 8,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+              elevation: 3,
             }}>
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Apply</Text>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>📅 Filters & Date Range</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
@@ -248,9 +293,13 @@ export default function AnalyticsDashboardScreen() {
               setAppliedRoom('ALL');
             }}
             style={{
-              backgroundColor: theme.primary, borderRadius: 4, paddingVertical: 6, paddingHorizontal: 14, marginRight: 8
+              backgroundColor: theme.secondary, 
+              borderRadius: 8, 
+              paddingVertical: 10, 
+              paddingHorizontal: 16, 
+              marginRight: 8
             }}>
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Refresh</Text>
+            <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16 }}>Reset All</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={async () => {
@@ -281,231 +330,19 @@ export default function AnalyticsDashboardScreen() {
               }
             }}
             style={{
-              backgroundColor: theme.primary,
-              borderRadius: 4,
-              paddingVertical: 6,
-              paddingHorizontal: 14
+              backgroundColor: theme.success,
+              borderRadius: 8,
+              paddingVertical: 10,
+              paddingHorizontal: 16
             }}
           >
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Export as CSV</Text>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Export CSV</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Filter Controls Row */}
-      <View style={{
-        backgroundColor: theme.cardBackground,
-        borderRadius: 12,
-        margin: 16,
-        marginTop: 8,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-      }}>
-        <Text style={{ 
-          fontSize: 18, 
-          fontWeight: 'bold', 
-          color: theme.text, 
-          marginBottom: 16,
-          textAlign: 'center'
-        }}>
-          Filters
-        </Text>
-        
-        {/* Filters in a grid layout */}
-        <View style={{ 
-          flexDirection: 'row', 
-          flexWrap: 'wrap', 
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          {/* User Filter */}
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            marginBottom: 12,
-            backgroundColor: theme.background,
-            borderRadius: 8,
-            padding: 8,
-            minWidth: '30%',
-            flex: 1,
-            marginRight: 8
-          }}>
-            <Text style={{ fontWeight: '600', marginRight: 8, color: theme.text, fontSize: 14 }}>User:</Text>
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-              <select
-                value={selectedUser}
-                onChange={e => setSelectedUser(e.target.value)}
-                style={{ 
-                  border: `1px solid ${theme.border}`, 
-                  borderRadius: 6, 
-                  padding: 6, 
-                  fontSize: 14, 
-                  marginRight: 8,
-                  background: theme.cardBackground, 
-                  color: theme.text,
-                  flex: 1,
-                  minWidth: 80
-                }}
-              >
-                <option value="ALL">All Users</option>
-                {users.map((u, i) => (
-                  <option key={i} value={u}>{u}</option>  
-                ))}
-              </select>
-              <TouchableOpacity
-                onPress={() => setAppliedUser(selectedUser)}
-                style={{ 
-                  backgroundColor: theme.primary, 
-                  borderRadius: 6, 
-                  paddingVertical: 4, 
-                  paddingHorizontal: 8 
-                }}>
-                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12 }}>Apply</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Device Filter */}
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            marginBottom: 12,
-            backgroundColor: theme.background,
-            borderRadius: 8,
-            padding: 8,
-            minWidth: '30%',
-            flex: 1,
-            marginRight: 8
-          }}>
-            <Text style={{ fontWeight: '600', marginRight: 8, color: theme.text, fontSize: 14 }}>Device:</Text>
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-              <select
-                value={selectedDevice}
-                onChange={e => setSelectedDevice(e.target.value)}
-                style={{ 
-                  border: `1px solid ${theme.border}`, 
-                  borderRadius: 6, 
-                  padding: 6, 
-                  fontSize: 14, 
-                  marginRight: 8,
-                  background: theme.cardBackground, 
-                  color: theme.text,
-                  flex: 1,
-                  minWidth: 80
-                }}
-              >
-                <option value="ALL">All Devices</option>
-                {devices.map((d, i) => (
-                  <option key={i} value={d.id}>{d.name}</option>  
-                ))}
-              </select>
-              <TouchableOpacity
-                onPress={() => {
-                  setAppliedDevice(selectedDevice);
-                  // Clear room filter when device is selected
-                  if (selectedDevice !== 'ALL') {
-                    setSelectedRoom('ALL');
-                    setAppliedRoom('ALL');
-                  }
-                }}
-                style={{ 
-                  backgroundColor: theme.primary, 
-                  borderRadius: 6, 
-                  paddingVertical: 4, 
-                  paddingHorizontal: 8 
-                }}>
-                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12 }}>Apply</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Room Filter */}
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            marginBottom: 12,
-            backgroundColor: theme.background,
-            borderRadius: 8,
-            padding: 8,
-            minWidth: '30%',
-            flex: 1
-          }}>
-            <Text style={{ fontWeight: '600', marginRight: 8, color: theme.text, fontSize: 14 }}>Room:</Text>
-            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-              <select
-                value={selectedRoom}
-                onChange={e => setSelectedRoom(e.target.value)}
-                style={{ 
-                  border: `1px solid ${theme.border}`, 
-                  borderRadius: 6, 
-                  padding: 6, 
-                  fontSize: 14, 
-                  marginRight: 8,
-                  background: theme.cardBackground, 
-                  color: theme.text,
-                  flex: 1,
-                  minWidth: 80
-                }}
-              >
-                <option value="ALL">All Rooms</option>
-                {rooms.map((r, i) => (
-                  <option key={i} value={r.id}>{r.name}</option>  
-                ))}
-              </select>
-              <TouchableOpacity
-                onPress={() => {
-                  setAppliedRoom(selectedRoom);
-                  // Clear device filter when room is selected
-                  if (selectedRoom !== 'ALL') {
-                    setSelectedDevice('ALL');
-                    setAppliedDevice('ALL');
-                  }
-                }}
-                style={{ 
-                  backgroundColor: theme.primary, 
-                  borderRadius: 6, 
-                  paddingVertical: 4, 
-                  paddingHorizontal: 8 
-                }}>
-                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12 }}>Apply</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-
-        {/* Clear All Filters Button */}
-        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8 }}>
-          <TouchableOpacity
-            onPress={() => {
-              setSelectedUser('ALL');
-              setAppliedUser('ALL');
-              setSelectedDevice('ALL');
-              setAppliedDevice('ALL');
-              setSelectedRoom('ALL');
-              setAppliedRoom('ALL');
-            }}
-            style={{ 
-              backgroundColor: theme.danger, 
-              borderRadius: 8, 
-              paddingVertical: 8, 
-              paddingHorizontal: 16,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.2,
-              shadowRadius: 2,
-              elevation: 2,
-            }}>
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>Clear All Filters</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Range Display */}
-      <Text style={{ fontWeight: 'bold', fontSize: 16, color: theme.text, marginLeft: 16, marginTop: 8 }}>
+      {/* Current Filters Display */}
+      <Text style={{ fontWeight: 'bold', fontSize: 16, color: theme.text, marginLeft: 16, marginTop: 16 }}>
         Viewing: {rangeDisplay}{getFilterDisplay()}
       </Text>
 
@@ -719,6 +556,278 @@ export default function AnalyticsDashboardScreen() {
         </View>
       )}
 
+      {/* Filter Modal */}
+      {showFilterModal && (
+        <View style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 1500,
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <View style={{
+            backgroundColor: theme.cardBackground,
+            borderRadius: 20,
+            padding: 24,
+            width: '90%',
+            maxWidth: 500,
+            maxHeight: '80%',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.3,
+            shadowRadius: 20,
+            elevation: 10,
+          }}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={{ 
+                fontSize: 24, 
+                fontWeight: 'bold', 
+                color: theme.text, 
+                marginBottom: 20,
+                textAlign: 'center'
+              }}>
+                📅 Filters & Date Range
+              </Text>
+
+              {/* Date Range Section */}
+              <View style={{
+                backgroundColor: theme.background,
+                borderRadius: 12,
+                padding: 16,
+                marginBottom: 20,
+              }}>
+                <Text style={{ 
+                  fontSize: 18, 
+                  fontWeight: 'bold', 
+                  color: theme.text, 
+                  marginBottom: 12,
+                  textAlign: 'center'
+                }}>
+                  📅 Date Range
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text, minWidth: 50 }}>Start:</Text>
+                  <input
+                    type="date"
+                    value={startDate}
+                    max={endDate}
+                    onChange={e => setStartDate(e.target.value)}
+                    style={{
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: 8, 
+                      padding: 10, 
+                      fontSize: 16, 
+                      flex: 1,
+                      background: theme.cardBackground, 
+                      color: theme.text
+                    }}
+                  />
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontWeight: 'bold', marginRight: 8, color: theme.text, minWidth: 50 }}>End:</Text>
+                  <input
+                    type="date"
+                    value={endDate}
+                    min={startDate}
+                    max={formatDate(new Date())}
+                    onChange={e => setEndDate(e.target.value)}
+                    style={{
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: 8, 
+                      padding: 10, 
+                      fontSize: 16, 
+                      flex: 1,
+                      background: theme.cardBackground, 
+                      color: theme.text
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* Filters Section */}
+              <View style={{
+                backgroundColor: theme.background,
+                borderRadius: 12,
+                padding: 16,
+                marginBottom: 20,
+              }}>
+                <Text style={{ 
+                  fontSize: 18, 
+                  fontWeight: 'bold', 
+                  color: theme.text, 
+                  marginBottom: 12,
+                  textAlign: 'center'
+                }}>
+                  🔍 Filters
+                </Text>
+
+                {/* User Filter */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontWeight: '600', marginBottom: 8, color: theme.text, fontSize: 16 }}>👤 User:</Text>
+                  <select
+                    value={selectedUser}
+                    onChange={e => setSelectedUser(e.target.value)}
+                    style={{ 
+                      border: `1px solid ${theme.border}`, 
+                      borderRadius: 8, 
+                      padding: 12, 
+                      fontSize: 16, 
+                      width: '100%',
+                      background: theme.cardBackground, 
+                      color: theme.text,
+                    }}
+                  >
+                    <option value="ALL">All Users</option>
+                    {users.map((u, i) => (
+                      <option key={i} value={u}>{u}</option>  
+                    ))}
+                  </select>
+                </View>
+
+                {/* Device Filter */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontWeight: '600', marginBottom: 8, color: theme.text, fontSize: 16 }}>📱 Device:</Text>
+                  <select
+                    value={selectedDevice}
+                    onChange={e => {
+                      setSelectedDevice(e.target.value);
+                      // Clear room filter when device is selected
+                      if (e.target.value !== 'ALL') {
+                        setSelectedRoom('ALL');
+                      }
+                    }}
+                    style={{ 
+                      border: `1px solid ${theme.border}`, 
+                      borderRadius: 8, 
+                      padding: 12, 
+                      fontSize: 16, 
+                      width: '100%',
+                      background: theme.cardBackground, 
+                      color: theme.text,
+                    }}
+                  >
+                    <option value="ALL">All Devices</option>
+                    {devices.map((d, i) => (
+                      <option key={i} value={d.id}>{d.name}</option>  
+                    ))}
+                  </select>
+                </View>
+
+                {/* Room Filter */}
+                <View style={{ marginBottom: 8 }}>
+                  <Text style={{ fontWeight: '600', marginBottom: 8, color: theme.text, fontSize: 16 }}>🏠 Room:</Text>
+                  <select
+                    value={selectedRoom}
+                    onChange={e => {
+                      setSelectedRoom(e.target.value);
+                      // Clear device filter when room is selected
+                      if (e.target.value !== 'ALL') {
+                        setSelectedDevice('ALL');
+                      }
+                    }}
+                    style={{ 
+                      border: `1px solid ${theme.border}`, 
+                      borderRadius: 8, 
+                      padding: 12, 
+                      fontSize: 16, 
+                      width: '100%',
+                      background: theme.cardBackground, 
+                      color: theme.text,
+                    }}
+                  >
+                    <option value="ALL">All Rooms</option>
+                    {rooms.map((r, i) => (
+                      <option key={i} value={r.id}>{r.name}</option>  
+                    ))}
+                  </select>
+                </View>
+
+                {/* Note about mutually exclusive filters */}
+                <Text style={{ 
+                  fontSize: 12, 
+                  color: theme.textSecondary, 
+                  textAlign: 'center',
+                  fontStyle: 'italic',
+                  marginTop: 8
+                }}>
+                  Note: Device and Room filters are mutually exclusive
+                </Text>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setShowFilterModal(false)}
+                  style={{ 
+                    backgroundColor: theme.secondary, 
+                    borderRadius: 12, 
+                    paddingVertical: 12, 
+                    paddingHorizontal: 20,
+                    flex: 1,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}>
+                  <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={() => {
+                    // Clear all filters
+                    setSelectedUser('ALL');
+                    setSelectedDevice('ALL');
+                    setSelectedRoom('ALL');
+                    const today = formatDate(new Date());
+                    setStartDate(today);
+                    setEndDate(today);
+                  }}
+                  style={{ 
+                    backgroundColor: theme.danger, 
+                    borderRadius: 12, 
+                    paddingVertical: 12, 
+                    paddingHorizontal: 20,
+                    flex: 1,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>Clear All</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={() => {
+                    // Apply all filters and date range
+                    setAppliedRange({ start: startDate, end: endDate });
+                    setAppliedUser(selectedUser);
+                    setAppliedDevice(selectedDevice);
+                    setAppliedRoom(selectedRoom);
+                    setShowFilterModal(false);
+                  }}
+                  style={{ 
+                    backgroundColor: theme.primary, 
+                    borderRadius: 12, 
+                    paddingVertical: 12, 
+                    paddingHorizontal: 20,
+                    flex: 1,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      )}
+
       {/* No Logs Modal Popup */}
       {showNoLogsModal && (
         <View style={{
@@ -733,22 +842,86 @@ export default function AnalyticsDashboardScreen() {
             backgroundColor: theme.cardBackground,
             borderRadius: 16,
             padding: 24,
-            minWidth: 280,
+            minWidth: 320,
             maxWidth: '90%',
             alignItems: 'center',
             elevation: 5,
           }}>
+            {/* Smart Title based on filters */}
             <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 10, color: theme.text }}>
-              No logs found for this date
+              {(() => {
+                const hasUser = appliedUser && appliedUser !== 'ALL';
+                const hasDevice = appliedDevice && appliedDevice !== 'ALL';
+                const hasRoom = appliedRoom && appliedRoom !== 'ALL';
+                
+                if (hasUser && hasDevice) {
+                  return `No activity found for ${appliedUser} with ${devices.find(d => d.id === appliedDevice)?.name || 'this device'}`;
+                } else if (hasUser && hasRoom) {
+                  return `No activity found for ${appliedUser} in ${rooms.find(r => r.id === appliedRoom)?.name || 'this room'}`;
+                } else if (hasUser) {
+                  return `No activity found for ${appliedUser}`;
+                } else if (hasDevice) {
+                  return `No activity found for ${devices.find(d => d.id === appliedDevice)?.name || 'this device'}`;
+                } else if (hasRoom) {
+                  return `No activity found in ${rooms.find(r => r.id === appliedRoom)?.name || 'this room'}`;
+                } else {
+                  return 'No activity found';
+                }
+              })()}
             </Text>
-            <Text style={{ color: theme.textSecondary, marginBottom: 18, textAlign: 'center' }}>
-              There are no activity logs for the selected date or date range.
+            
+            {/* Smart message based on filters */}
+            <Text style={{ color: theme.textSecondary, marginBottom: 18, textAlign: 'center', lineHeight: 20 }}>
+              {(() => {
+                const hasUser = appliedUser && appliedUser !== 'ALL';
+                const hasDevice = appliedDevice && appliedDevice !== 'ALL';
+                const hasRoom = appliedRoom && appliedRoom !== 'ALL';
+                const hasFilters = hasUser || hasDevice || hasRoom;
+                
+                if (hasFilters) {
+                  let suggestions = [];
+                  if (hasUser || hasDevice || hasRoom) {
+                    suggestions.push('Try adjusting your filters');
+                  }
+                  suggestions.push('select a different date range');
+                  suggestions.push('or check if devices are active');
+                  
+                  return `No logs match your current filters for ${rangeDisplay}.\n\n${suggestions.join(', ')}.`;
+                } else {
+                  return `No activity logs were recorded for ${rangeDisplay}.\n\nTry selecting a different date range or check if your smart home devices are connected and active.`;
+                }
+              })()}
             </Text>
-            <TouchableOpacity
-              onPress={() => setShowNoLogsModal(false)}
-              style={{ backgroundColor: theme.primary, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 24 }}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Close</Text>
-            </TouchableOpacity>
+            
+            {/* Action buttons */}
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {(appliedUser !== 'ALL' || appliedDevice !== 'ALL' || appliedRoom !== 'ALL') && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedUser('ALL');
+                    setAppliedUser('ALL');
+                    setSelectedDevice('ALL');
+                    setAppliedDevice('ALL');
+                    setSelectedRoom('ALL');
+                    setAppliedRoom('ALL');
+                    setShowNoLogsModal(false);
+                  }}
+                  style={{ 
+                    backgroundColor: theme.secondary, 
+                    borderRadius: 6, 
+                    paddingVertical: 8, 
+                    paddingHorizontal: 16,
+                    marginRight: 8
+                  }}>
+                  <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 14 }}>Clear Filters</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => setShowNoLogsModal(false)}
+                style={{ backgroundColor: theme.primary, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 24 }}>
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
