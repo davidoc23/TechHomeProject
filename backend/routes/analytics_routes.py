@@ -538,6 +538,25 @@ def export_usage_csv():
     query = apply_device_room_filters(query)
 
     logs = list(db.device_logs.find(query).sort('timestamp', 1))
+    
+    if not logs:
+        return jsonify({"error": "No logs found for the selected date or range."}), 404
+
+    # Build device lookup for friendly names
+    try:
+        all_devices = list(db.devices_collection.find({}))
+    except Exception:
+        all_devices = []
+    
+    device_lookup = {}
+    for d in all_devices:
+        device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
+        if "entityId" in d:
+            device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
+
+    def get_friendly_name(device_id):
+        return device_lookup.get(device_id, device_id)
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(['User', 'Device', 'Action', 'Result', 'Timestamp'])
@@ -547,17 +566,19 @@ def export_usage_csv():
             ts_str = ts.astimezone(irl).strftime('%Y-%m-%d %H:%M:%S')
         else:
             ts_str = str(ts)
+        
+        device_id = log.get('device', '')
+        device_name = get_friendly_name(device_id)
+        
         writer.writerow([
             log.get('user', ''),
-            log.get('device', ''),
+            device_name,  # Use friendly name instead of device ID
             log.get('action', ''),
             log.get('result', ''),
             ts_str
         ])
+    
     output.seek(0)
-    if not logs:
-        return jsonify({"error": "No logs found for the selected date or range."}), 404
-
     return Response(output.getvalue(),
                     mimetype="text/csv",
                     headers={"Content-Disposition": "attachment;filename=techhome_usage_logs.csv"})
