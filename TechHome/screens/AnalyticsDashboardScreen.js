@@ -347,8 +347,8 @@ export default function AnalyticsDashboardScreen() {
       </Text>
 
       {/* Recent Activity Feed */}
-      <View style={{ flex: 1, backgroundColor: theme.cardBackground, borderRadius: 16, marginHorizontal: 15, marginTop: 32, padding: 4, marginBottom: 32, paddingBottom: 45, minHeight: 300 }}>
-        <Text style={{ fontSize: 20, fontWeight: 'bold', marginLeft: 8, marginTop: 8, color: theme.text, marginHorizontal: 14 }}>
+      <View style={{ backgroundColor: theme.cardBackground, borderRadius: 16, marginHorizontal: 15, marginTop: 32, padding: 16, marginBottom: 32, minHeight: 300 }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: theme.text }}>
           Recent Activity Feed
         </Text>
         {loadingFeed ? (
@@ -356,18 +356,15 @@ export default function AnalyticsDashboardScreen() {
         ) : recentActions.length === 0 ? (
           <Text style={{ textAlign: 'center', color: theme.textSecondary, margin: 20 }}>No recent activity.</Text>
         ) : (
-          <View style={{ margin: 12, backgroundColor: theme.cardBackground, borderRadius: 8, padding: 0 }}>
+          <View style={{ backgroundColor: theme.cardBackground, borderRadius: 8 }}>
             {recentActions.slice(0, 4).map((item, i, arr) => (
               <View
                 key={i}
                 style={{
                   borderBottomWidth: i === arr.length - 1 ? 0 : 1,
                   borderBottomColor: theme.border,
-                  marginHorizontal: 14,
-                  marginBottom: 12,
                   paddingVertical: 14,
                   paddingHorizontal: 12,
-                  marginHorizontal: 4,
                   backgroundColor: i % 2 === 0 ? theme.cardBackground : (theme.feedAltBackground || theme.background),
                   borderTopLeftRadius: i === 0 ? 8 : 0,
                   borderTopRightRadius: i === 0 ? 8 : 0,
@@ -459,15 +456,15 @@ export default function AnalyticsDashboardScreen() {
       </View>
 
       {/* Hourly Usage Trends Chart */}
-      <View style={{ flex: 1, marginLeft: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 4, marginTop: 32, paddingBottom: 45 }}>
-        <Text style={{ fontSize: 20, fontWeight: 'bold', marginLeft: 8, marginTop: 8, color: theme.text }}>
+      <View style={{ marginHorizontal: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 16, marginTop: 32, paddingBottom: 20 }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: theme.text }}>
           Hourly Usage Trends
         </Text>
         {loadingHourly ? (
           <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading hourly usage data…</Text>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
+            <View style={{ paddingHorizontal: 8 }}>
               <BarChart
                 data={hourlyData}
                 width={barWidth * barCount}
@@ -475,7 +472,7 @@ export default function AnalyticsDashboardScreen() {
                 fromZero
                 chartConfig={deviceChartConfig}
                 showValuesOnTopOfBars={true}
-                style={{ marginVertical: 8, borderRadius: 16, alignSelf: 'center', backgroundColor: theme.cardBackground }}
+                style={{ marginVertical: 8, borderRadius: 16 }}
                 barPercentage={0.7}
               />
               {/* Transparent overlay for making the x-axis numbers clickable */}
@@ -483,7 +480,7 @@ export default function AnalyticsDashboardScreen() {
                 pointerEvents="box-none"
                 style={{
                   position: 'absolute',
-                  left: 0,
+                  left: 8,
                   top: 196,
                   flexDirection: 'row',
                   width: barWidth * barCount,
