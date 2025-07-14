@@ -57,6 +57,13 @@ export default function AnalyticsDashboardScreen() {
   const [selectedRoom, setSelectedRoom] = useState('ALL'); // all rooms
   const [appliedRoom, setAppliedRoom] = useState('ALL'); // Applied filter
 
+  // View mode states for trends
+  const [viewMode, setViewMode] = useState('daily'); // 'daily', 'weekly', 'monthly'
+  const [weeklyData, setWeeklyData] = useState([]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [loadingWeekly, setLoadingWeekly] = useState(false);
+  const [loadingMonthly, setLoadingMonthly] = useState(false);
+
   // Helper: build query string for range, user, device, and room
   function dateQuery() {
     let query = '';
@@ -110,7 +117,27 @@ export default function AnalyticsDashboardScreen() {
     fetch(`http://localhost:5000/api/analytics/usage-per-hour${dateQuery()}`)
       .then(res => res.json()).then(data => { setHourlyUsage(data); setLoadingHourly(false); })
       .catch(() => setLoadingHourly(false));
-  }, [appliedRange, appliedUser, appliedDevice, appliedRoom]);
+
+    // Fetch weekly/monthly data if needed
+    if (viewMode === 'weekly') {
+      setLoadingWeekly(true);
+      fetch(`http://localhost:5000/api/analytics/usage-per-week${dateQuery()}`)
+        .then(res => res.json()).then(data => { setWeeklyData(data); setLoadingWeekly(false); })
+        .catch(() => setLoadingWeekly(false));
+    } else if (viewMode === 'monthly') {
+      setLoadingMonthly(true);
+      fetch(`http://localhost:5000/api/analytics/usage-per-month${dateQuery()}`)
+        .then(res => res.json()).then(data => { setMonthlyData(data); setLoadingMonthly(false); })
+        .catch(() => setLoadingMonthly(false));
+    }
+  }, [appliedRange, appliedUser, appliedDevice, appliedRoom, viewMode]);
+
+  // Close hour modal when switching away from daily mode
+  useEffect(() => {
+    if (viewMode !== 'daily' && showHourModal) {
+      setShowHourModal(false);
+    }
+  }, [viewMode]);
 
   // Periodic auto-refresh
   useEffect(() => {
@@ -120,8 +147,10 @@ export default function AnalyticsDashboardScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Drill-down by hour
+  // Drill-down by hour (only works in daily mode)
   const handleHourPress = (hourIdx) => {
+    if (viewMode !== 'daily') return; // Only allow hour drill-down in daily mode
+    
     setSelectedHour(hourIdx);
     setShowHourModal(true);
     setLoadingHourActions(true);
@@ -291,6 +320,8 @@ export default function AnalyticsDashboardScreen() {
               setAppliedDevice('ALL');
               setSelectedRoom('ALL');
               setAppliedRoom('ALL');
+              // Reset view mode to daily
+              setViewMode('daily');
             }}
             style={{
               backgroundColor: theme.secondary, 
@@ -303,7 +334,7 @@ export default function AnalyticsDashboardScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={async () => {
-              const url = `http://localhost:5000/api/analytics/export-usage-csv${dateQuery()}`;
+              const url = `http://localhost:5000/api/analytics/export-usage-csv-grouped${dateQuery()}&groupBy=${viewMode === 'daily' ? 'day' : viewMode === 'weekly' ? 'week' : 'month'}`;
               try {
                 const response = await fetch(url);
                 const contentType = response.headers.get('content-type');
@@ -317,7 +348,7 @@ export default function AnalyticsDashboardScreen() {
                   const downloadUrl = window.URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = downloadUrl;
-                  a.download = 'techhome_usage_logs.csv';
+                  a.download = `techhome_usage_logs_${viewMode === 'daily' ? 'day' : viewMode === 'weekly' ? 'week' : 'month'}.csv`;
                   document.body.appendChild(a);
                   a.click();
                   a.remove();
@@ -336,7 +367,9 @@ export default function AnalyticsDashboardScreen() {
               paddingHorizontal: 16
             }}
           >
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Export CSV</Text>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+              Export {viewMode === 'daily' ? 'Daily' : viewMode === 'weekly' ? 'Weekly' : 'Monthly'} CSV
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -345,6 +378,49 @@ export default function AnalyticsDashboardScreen() {
       <Text style={{ fontWeight: 'bold', fontSize: 16, color: theme.text, marginLeft: 16, marginTop: 16 }}>
         Viewing: {rangeDisplay}{getFilterDisplay()}
       </Text>
+
+      {/* View Mode Toggle */}
+      <View style={{ 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        marginHorizontal: 16, 
+        marginTop: 16, 
+        backgroundColor: theme.cardBackground, 
+        borderRadius: 12, 
+        padding: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+      }}>
+        <Text style={{ fontWeight: 'bold', fontSize: 16, color: theme.text, marginRight: 12, marginLeft: 8 }}>
+          View Mode:
+        </Text>
+        {['daily', 'weekly', 'monthly'].map((mode) => (
+          <TouchableOpacity
+            key={mode}
+            onPress={() => setViewMode(mode)}
+            style={{
+              flex: 1,
+              backgroundColor: viewMode === mode ? theme.primary : 'transparent',
+              borderRadius: 8,
+              paddingVertical: 10,
+              paddingHorizontal: 12,
+              marginHorizontal: 2,
+            }}>
+            <Text style={{ 
+              color: viewMode === mode ? '#fff' : theme.text, 
+              fontWeight: viewMode === mode ? 'bold' : 'normal',
+              fontSize: 14,
+              textAlign: 'center',
+              textTransform: 'capitalize'
+            }}>
+              {mode}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       {/* Recent Activity Feed */}
       <View style={{ backgroundColor: theme.cardBackground, borderRadius: 16, marginHorizontal: 15, marginTop: 32, padding: 16, marginBottom: 32, minHeight: 300 }}>
@@ -455,54 +531,134 @@ export default function AnalyticsDashboardScreen() {
         </View>
       </View>
 
-      {/* Hourly Usage Trends Chart */}
+      {/* Usage Trends Chart - Conditional based on view mode */}
       <View style={{ marginHorizontal: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 16, marginTop: 32, paddingBottom: 20 }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: theme.text }}>
-          Hourly Usage Trends
+          {viewMode === 'daily' ? 'Hourly Usage Trends' :
+           viewMode === 'weekly' ? 'Weekly Usage Trends' :
+           'Monthly Usage Trends'}
         </Text>
-        {loadingHourly ? (
-          <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading hourly usage data…</Text>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
-            <View style={{ paddingHorizontal: 8 }}>
-              <BarChart
-                data={hourlyData}
-                width={barWidth * barCount}
-                height={220}
-                fromZero
-                chartConfig={deviceChartConfig}
-                showValuesOnTopOfBars={true}
-                style={{ marginVertical: 8, borderRadius: 16 }}
-                barPercentage={0.7}
-              />
-              {/* Transparent overlay for making the x-axis numbers clickable */}
-              <View
-                pointerEvents="box-none"
-                style={{
-                  position: 'absolute',
-                  left: 8,
-                  top: 196,
-                  flexDirection: 'row',
-                  width: barWidth * barCount,
-                  height: 24,
-                }}
-              >
-                {hourLabels.map((label, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    onPress={() => handleHourPress(i)}
-                    activeOpacity={0.15}
-                    style={{ width: barWidth, height: 24 }}
+        
+        {/* Daily (Hourly) View */}
+        {viewMode === 'daily' && (
+          <>
+            {loadingHourly ? (
+              <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading hourly usage data…</Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
+                <View style={{ paddingHorizontal: 8 }}>
+                  <BarChart
+                    data={hourlyData}
+                    width={barWidth * barCount}
+                    height={220}
+                    fromZero
+                    chartConfig={deviceChartConfig}
+                    showValuesOnTopOfBars={true}
+                    style={{ marginVertical: 8, borderRadius: 16 }}
+                    barPercentage={0.7}
                   />
-                ))}
-              </View>
-            </View>
-          </ScrollView>
+                  {/* Transparent overlay for making the x-axis numbers clickable */}
+                  <View
+                    pointerEvents="box-none"
+                    style={{
+                      position: 'absolute',
+                      left: 8,
+                      top: 196,
+                      flexDirection: 'row',
+                      width: barWidth * barCount,
+                      height: 24,
+                    }}
+                  >
+                    {hourLabels.map((label, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => handleHourPress(i)}
+                        activeOpacity={0.15}
+                        style={{ width: barWidth, height: 24 }}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </ScrollView>
+            )}
+          </>
+        )}
+
+        {/* Weekly View */}
+        {viewMode === 'weekly' && (
+          <>
+            {loadingWeekly ? (
+              <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading weekly usage data…</Text>
+            ) : weeklyData.length === 0 ? (
+              <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No weekly data available.</Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
+                <View style={{ paddingHorizontal: 8 }}>
+                  <BarChart
+                    data={{
+                      labels: weeklyData.map(item => {
+                        // Truncate long week labels for better display
+                        const label = item.period || item.week;
+                        return label.length > 10 ? label.slice(0, 10) + '…' : label;
+                      }),
+                      datasets: [{ data: weeklyData.map(item => item.actions) }]
+                    }}
+                    width={Math.max(screenWidth, weeklyData.length * 80)}
+                    height={220}
+                    fromZero
+                    chartConfig={{
+                      ...deviceChartConfig,
+                      color: (opacity = 1) => isDarkMode ? `rgba(255, 165, 0, ${opacity})` : `rgba(255, 140, 0, ${opacity})`, // Orange for weekly
+                    }}
+                    showValuesOnTopOfBars={true}
+                    style={{ marginVertical: 8, borderRadius: 16 }}
+                    barPercentage={0.7}
+                  />
+                </View>
+              </ScrollView>
+            )}
+          </>
+        )}
+
+        {/* Monthly View */}
+        {viewMode === 'monthly' && (
+          <>
+            {loadingMonthly ? (
+              <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading monthly usage data…</Text>
+            ) : monthlyData.length === 0 ? (
+              <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No monthly data available.</Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
+                <View style={{ paddingHorizontal: 8 }}>
+                  <BarChart
+                    data={{
+                      labels: monthlyData.map(item => {
+                        // Truncate long month labels for better display
+                        const label = item.period || item.month;
+                        return label.length > 10 ? label.slice(0, 10) + '…' : label;
+                      }),
+                      datasets: [{ data: monthlyData.map(item => item.actions) }]
+                    }}
+                    width={Math.max(screenWidth, monthlyData.length * 100)}
+                    height={220}
+                    fromZero
+                    chartConfig={{
+                      ...deviceChartConfig,
+                      color: (opacity = 1) => isDarkMode ? `rgba(156, 39, 176, ${opacity})` : `rgba(142, 36, 170, ${opacity})`, // Purple for monthly
+                    }}
+                    showValuesOnTopOfBars={true}
+                    style={{ marginVertical: 8, borderRadius: 16 }}
+                    barPercentage={0.7}
+                  />
+                </View>
+              </ScrollView>
+            )}
+          </>
         )}
       </View>
 
-      {/* Hour Modal Overlay */}
-      {showHourModal && (
+      {/* Hour Modal Overlay - Only show in daily mode */}
+      {showHourModal && viewMode === 'daily' && (
         <View style={{
           position: 'absolute',
           top: 0, left: 0, right: 0, bottom: 0,
@@ -780,6 +936,8 @@ export default function AnalyticsDashboardScreen() {
                     const today = formatDate(new Date());
                     setStartDate(today);
                     setEndDate(today);
+                    // Reset view mode to daily
+                    setViewMode('daily');
                   }}
                   style={{ 
                     backgroundColor: theme.danger, 
@@ -901,6 +1059,7 @@ export default function AnalyticsDashboardScreen() {
                     setAppliedDevice('ALL');
                     setSelectedRoom('ALL');
                     setAppliedRoom('ALL');
+                    setViewMode('daily');
                     setShowNoLogsModal(false);
                   }}
                   style={{ 

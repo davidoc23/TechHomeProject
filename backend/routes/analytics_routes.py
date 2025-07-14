@@ -582,3 +582,283 @@ def export_usage_csv():
     return Response(output.getvalue(),
                     mimetype="text/csv",
                     headers={"Content-Disposition": "attachment;filename=techhome_usage_logs.csv"})
+# Usage Per Week
+@analytics_routes.route('/usage-per-week', methods=['GET'])
+def usage_per_week():
+    """
+    Group usage data by week within the given date range.
+    Returns week periods with action counts.
+    """
+    start, end = get_date_range()
+    if not start or not end:
+        # Default to last 8 weeks if no range specified
+        end = datetime.now(utc)
+        start = end - timedelta(weeks=8)
+    
+    match = {"timestamp": {"$gte": start, "$lt": end}}
+    
+    # Apply user filter
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        match["user"] = user
+    
+    # Apply device/room filters
+    match = apply_device_room_filters(match)
+    
+    pipeline = [
+        {"$match": match},
+        {
+            "$addFields": {
+                "week": {
+                    "$dateToString": {
+                        "format": "%Y-W%U",
+                        "date": "$timestamp",
+                        "timezone": "Europe/Dublin"
+                    }
+                },
+                "year": {"$year": {"date": "$timestamp", "timezone": "Europe/Dublin"}},
+                "weekNum": {"$week": {"date": "$timestamp", "timezone": "Europe/Dublin"}}
+            }
+        },
+        {
+            "$group": {
+                "_id": "$week",
+                "actions": {"$sum": 1},
+                "year": {"$first": "$year"},
+                "weekNum": {"$first": "$weekNum"}
+            }
+        },
+        {"$sort": {"year": 1, "weekNum": 1}}
+    ]
+    
+    results = list(db.device_logs.aggregate(pipeline))
+    
+    # Format the results with readable week labels
+    data = []
+    for r in results:
+        week_label = r["_id"]
+        # Convert to more readable format like "Week 1, 2025"
+        if r.get("weekNum") is not None and r.get("year") is not None:
+            week_label = f"Week {r['weekNum']}, {r['year']}"
+        
+        data.append({
+            "period": week_label,
+            "week": r["_id"],
+            "actions": r["actions"]
+        })
+    
+    return jsonify(data)
+
+# Usage Per Month
+@analytics_routes.route('/usage-per-month', methods=['GET'])
+def usage_per_month():
+    """
+    Group usage data by month within the given date range.
+    Returns month periods with action counts.
+    """
+    start, end = get_date_range()
+    if not start or not end:
+        # Default to last 12 months if no range specified
+        end = datetime.now(utc)
+        start = end - timedelta(days=365)
+    
+    match = {"timestamp": {"$gte": start, "$lt": end}}
+    
+    # Apply user filter
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        match["user"] = user
+    
+    # Apply device/room filters
+    match = apply_device_room_filters(match)
+    
+    pipeline = [
+        {"$match": match},
+        {
+            "$addFields": {
+                "month": {
+                    "$dateToString": {
+                        "format": "%Y-%m",
+                        "date": "$timestamp",
+                        "timezone": "Europe/Dublin"
+                    }
+                },
+                "year": {"$year": {"date": "$timestamp", "timezone": "Europe/Dublin"}},
+                "monthNum": {"$month": {"date": "$timestamp", "timezone": "Europe/Dublin"}}
+            }
+        },
+        {
+            "$group": {
+                "_id": "$month",
+                "actions": {"$sum": 1},
+                "year": {"$first": "$year"},
+                "monthNum": {"$first": "$monthNum"}
+            }
+        },
+        {"$sort": {"year": 1, "monthNum": 1}}
+    ]
+    
+    results = list(db.device_logs.aggregate(pipeline))
+    
+    # Format the results with readable month labels
+    month_names = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    ]
+    
+    data = []
+    for r in results:
+        month_label = r["_id"]
+        # Convert to more readable format like "January 2025"
+        if r.get("monthNum") is not None and r.get("year") is not None:
+            month_name = month_names[r["monthNum"] - 1] if 1 <= r["monthNum"] <= 12 else f"Month {r['monthNum']}"
+            month_label = f"{month_name} {r['year']}"
+        
+        data.append({
+            "period": month_label,
+            "month": r["_id"],
+            "actions": r["actions"]
+        })
+    
+    return jsonify(data)
+
+# Export CSV with grouping support
+@analytics_routes.route('/export-usage-csv-grouped', methods=['GET'])
+def export_usage_csv_grouped():
+    """
+    Export usage data as CSV with optional grouping by day/week/month.
+    Supports 'groupBy' parameter: 'day', 'week', 'month'
+    """
+    # Get grouping parameter
+    group_by = request.args.get('groupBy', 'day').lower()
+    if group_by not in ['day', 'week', 'month']:
+        group_by = 'day'
+    
+    # Get date range
+    start, end = get_date_range()
+    irl = timezone('Europe/Dublin')
+    query = {}
+
+    if start and end:
+        query['timestamp'] = {'$gte': start, '$lt': end}
+    
+    # Apply user filter
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        query['user'] = user
+
+    # Apply device/room filters
+    query = apply_device_room_filters(query)
+
+    if group_by == 'day':
+        # Use existing logic for daily export
+        logs = list(db.device_logs.find(query).sort('timestamp', 1))
+        
+        if not logs:
+            return jsonify({"error": "No logs found for the selected criteria."}), 404
+
+        # Build device lookup
+        all_devices = list(db.devices_collection.find({}))
+        device_lookup = {}
+        for d in all_devices:
+            device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
+            if "entityId" in d:
+                device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
+
+        def get_friendly_name(device_id):
+            return device_lookup.get(device_id, device_id)
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Date', 'User', 'Device', 'Action', 'Result', 'Timestamp'])
+        
+        for log in logs:
+            ts = log.get('timestamp', '')
+            if isinstance(ts, datetime):
+                ts_str = ts.astimezone(irl).strftime('%Y-%m-%d %H:%M:%S')
+                date_str = ts.astimezone(irl).strftime('%Y-%m-%d')
+            else:
+                ts_str = str(ts)
+                date_str = ''
+            
+            device_id = log.get('device', '')
+            device_name = get_friendly_name(device_id)
+            
+            writer.writerow([
+                date_str,
+                log.get('user', ''),
+                device_name,
+                log.get('action', ''),
+                log.get('result', ''),
+                ts_str
+            ])
+    
+    else:
+        # Grouped export (weekly/monthly)
+        if group_by == 'week':
+            group_format = "%Y-W%U"
+            period_label = "Week"
+        else:  # monthly
+            group_format = "%Y-%m" 
+            period_label = "Month"
+        
+        pipeline = [
+            {"$match": query},
+            {
+                "$addFields": {
+                    "period": {
+                        "$dateToString": {
+                            "format": group_format,
+                            "date": "$timestamp",
+                            "timezone": "Europe/Dublin"
+                        }
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "period": "$period",
+                        "user": "$user",
+                        "device": "$device"
+                    },
+                    "actions": {"$sum": 1}
+                }
+            },
+            {"$sort": {"_id.period": 1, "_id.user": 1, "_id.device": 1}}
+        ]
+        
+        results = list(db.device_logs.aggregate(pipeline))
+        
+        if not results:
+            return jsonify({"error": "No logs found for the selected criteria."}), 404
+        
+        # Build device lookup
+        all_devices = list(db.devices_collection.find({}))
+        device_lookup = {}
+        for d in all_devices:
+            device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
+            if "entityId" in d:
+                device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
+
+        def get_friendly_name(device_id):
+            return device_lookup.get(device_id, device_id)
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([period_label, 'User', 'Device', 'Total Actions'])
+        
+        for result in results:
+            period = result["_id"]["period"]
+            user = result["_id"]["user"]
+            device_id = result["_id"]["device"]
+            device_name = get_friendly_name(device_id)
+            actions = result["actions"]
+            
+            writer.writerow([period, user, device_name, actions])
+    
+    output.seek(0)
+    filename = f"techhome_usage_logs_{group_by}.csv"
+    return Response(output.getvalue(),
+                    mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment;filename={filename}"})
