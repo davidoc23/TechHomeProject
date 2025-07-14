@@ -27,12 +27,20 @@ This file details my individual contributions to the TechHomeProject Final Year 
     - Logging works for both successful and failed attempts, ensuring a complete audit trail.
   - Added JWT authentication and required tokens to device endpoints to enable user attribution.
   - Built `/api/analytics/usage-per-user` and `/api/analytics/usage-per-device` endpoints to aggregate and report device actions by user and by device, supporting usage analytics and security auditing.
+  - Developed comprehensive analytics endpoints for multi-view trend analysis:
+    - `/api/analytics/usage-per-week` - Weekly trend aggregation with readable week labels
+    - `/api/analytics/usage-per-month` - Monthly trend aggregation with readable month labels
+    - `/api/analytics/week-breakdown/<week_id>` - Daily breakdown for specific weeks
+    - `/api/analytics/month-breakdown/<month_id>` - Daily breakdown for specific months
+    - `/api/analytics/daily-breakdown/<date_str>` - Hourly breakdown for specific days
+    - `/api/analytics/export-usage-csv-grouped` - CSV export with time period grouping support
+  - Enhanced all endpoints with comprehensive filter support (user, device, room) and timezone-aware date handling.
   - Developed analytics endpoints for top actions, device/user drilldown, and grouped activity logs.
   - Developed automated test cases to verify logging works as expected, including user attribution and database cleanup after each test.
   - Addressed challenges such as missing JWTs, 404 errors, and log verification by iteratively debugging both backend and frontend, adding cleanup steps, and adjusting test setup to match real-world API flows.
 
 - **Web Analytics Dashboard**
-  - Built a React Native (Expo) dashboard for web:
+  - Built a comprehensive React Native (Expo) dashboard for web with advanced analytics capabilities:
     - **Device Usage Chart:** Bar chart showing most-used devices, with friendly device names (from both local Mongo and Home Assistant).
     - **User Activity Chart:** Bar chart of most frequent users (real user attribution thanks to JWTs).
     - **Recent Activity Feed:** Feed of latest device actions, grouping "toggle all" actions together for clarity, with device lists as sub-items.
@@ -47,6 +55,34 @@ This file details my individual contributions to the TechHomeProject Final Year 
     - **No Logs Modal:** A modal now displays clearly when no logs are found for a selected date/filter, improving user feedback.
     - **Manual and Auto-Refresh:** Added a manual Refresh button to immediately reload analytics for today. The dashboard auto-refreshes every 5 minutes for up-to-date data without user action.
     - **User Filtering:** Added a user filter dropdown and "Apply User" button to the analytics dashboard, allowing filtering of all analytics, charts, activity feed, hourly modal, and CSV export by user or all users. Backend endpoints were updated to support a `user` query parameter for all analytics and export routes. The user filter UI is positioned on the right for improved layout.
+    
+    **Advanced Filtering & Modal System:**
+    - **Unified Filter Modal:** Comprehensive filtering interface combining date range, user, device, and room filters with single apply action
+    - **Smart Contextual Messaging:** Intelligent "no data found" modal with filter-specific messages and actionable suggestions
+    - **Mutual Exclusivity Logic:** Device and room filters are mutually exclusive with clear visual feedback
+    - **Enhanced CSV Export:** Displays readable device names instead of device IDs with grouping support for different time periods
+    
+    **Multi-View Trend Analysis:**
+    - **Three-Tier View System:** 
+      * **Daily View:** Hourly breakdown (0-23 hours) with blue color coding
+      * **Weekly View:** Weekly trends with orange color coding
+      * **Monthly View:** Monthly trends with purple color coding
+    - **Interactive Drill-Down Functionality:**
+      * Daily mode: Click hour bars → detailed hourly activity breakdown
+      * Weekly mode: Click week bars → daily breakdown for selected week  
+      * Monthly mode: Click month bars → daily breakdown for selected month
+    - **Smart Modal Management:** Period-specific breakdown modals showing top users and devices with auto-close when switching views
+    
+    **UX & Design Enhancements:**
+    - **Streamlined Interface:** Clean three-button layout (Filters & Date Range, Reset All, Export CSV)
+    - **Modern Responsive Modals:** Scrollable content with intuitive button layouts and proper mobile responsiveness
+    - **Color-Coded Chart System:** Consistent visual distinction between time periods with unified BarChart components
+    - **Dynamic Export Button:** Text changes based on current view mode (daily/weekly/monthly)
+    
+    **Enhanced Technical Features:**
+    - **Chart Consistency:** Fixed data validation and loading states across all view modes for reliable user experience
+    - **Filter State Management:** Proper mutual exclusivity logic with auto-reset functionality
+    - **Enhanced Error States:** Comprehensive handling of loading, empty, and error states with helpful user guidance
 
 - **Automated Testing**
   - Authored the entire backend test suite (`tests/`), including:
@@ -64,19 +100,17 @@ This file details my individual contributions to the TechHomeProject Final Year 
   - Contributed to device management UI (`DeviceManagementScreen.js`) for displaying and adding Home Assistant devices.
   - Updated all device-related frontend calls to send authentication tokens for secure user attribution.
 
----
 
 ## Key Files
 
 - `backend/app.py`, `routes/device_routes.py` – Main endpoints, device logic, device action logging, JWT checks
-- `backend/routes/analytics_routes.py` – Analytics endpoints for user and device stats, activity feeds
+- `backend/routes/analytics_routes.py` – Comprehensive analytics endpoints including user/device stats, activity feeds, multi-view trends (daily/weekly/monthly), drill-down breakdowns, and grouped CSV exports
 - `backend/scheduler.py` – Automation scheduling for Home Assistant devices
 - `backend/tests/` – Complete backend test suite
 - `TechHome/hooks/useHomeAssistantDevices.js` – Home Assistant device logic in React Native
 - `TechHome/screens/DeviceManagementScreen.js` – Device management UI
 - `TechHome/screens/AnalyticsDashboardScreen.js` – New analytics dashboard for web/mobile
 
----
 
 ## Device Action Logging & Analytics Example
 
@@ -155,7 +189,6 @@ Spent significant time trying to fix a bug where times/logs show one hour behind
 - All test files in `backend/tests/` authored by me.
 - Git commit history and this document demonstrate the timeline and scope of my work.
 
----
 
 ## Contact
 

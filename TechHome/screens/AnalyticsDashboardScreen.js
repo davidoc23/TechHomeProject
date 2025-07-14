@@ -34,6 +34,13 @@ export default function AnalyticsDashboardScreen() {
   const [showHourModal, setShowHourModal] = useState(false);
   const [loadingHourActions, setLoadingHourActions] = useState(false);
 
+  // Weekly/Monthly drill-down state
+  const [selectedPeriod, setSelectedPeriod] = useState(null);
+  const [periodActions, setPeriodActions] = useState([]);
+  const [showPeriodModal, setShowPeriodModal] = useState(false);
+  const [loadingPeriodActions, setLoadingPeriodActions] = useState(false);
+  const [periodType, setPeriodType] = useState(''); // 'week' or 'month'
+
   const { theme, isDarkMode } = useTheme();
 
   // No logs modal state
@@ -59,8 +66,10 @@ export default function AnalyticsDashboardScreen() {
 
   // View mode states for trends
   const [viewMode, setViewMode] = useState('daily'); // 'daily', 'weekly', 'monthly'
+  const [dailyData, setDailyData] = useState([]);
   const [weeklyData, setWeeklyData] = useState([]);
   const [monthlyData, setMonthlyData] = useState([]);
+  const [loadingDaily, setLoadingDaily] = useState(false);
   const [loadingWeekly, setLoadingWeekly] = useState(false);
   const [loadingMonthly, setLoadingMonthly] = useState(false);
 
@@ -118,8 +127,13 @@ export default function AnalyticsDashboardScreen() {
       .then(res => res.json()).then(data => { setHourlyUsage(data); setLoadingHourly(false); })
       .catch(() => setLoadingHourly(false));
 
-    // Fetch weekly/monthly data if needed
-    if (viewMode === 'weekly') {
+    // Fetch weekly/monthly/daily data if needed
+    if (viewMode === 'daily') {
+      setLoadingDaily(true);
+      fetch(`http://localhost:5000/api/analytics/usage-per-day${dateQuery()}`)
+        .then(res => res.json()).then(data => { setDailyData(data); setLoadingDaily(false); })
+        .catch(() => setLoadingDaily(false));
+    } else if (viewMode === 'weekly') {
       setLoadingWeekly(true);
       fetch(`http://localhost:5000/api/analytics/usage-per-week${dateQuery()}`)
         .then(res => res.json()).then(data => { setWeeklyData(data); setLoadingWeekly(false); })
@@ -132,10 +146,13 @@ export default function AnalyticsDashboardScreen() {
     }
   }, [appliedRange, appliedUser, appliedDevice, appliedRoom, viewMode]);
 
-  // Close hour modal when switching away from daily mode
+  // Close modals when switching view modes
   useEffect(() => {
     if (viewMode !== 'daily' && showHourModal) {
       setShowHourModal(false);
+    }
+    if ((viewMode !== 'weekly' && viewMode !== 'monthly') && showPeriodModal) {
+      setShowPeriodModal(false);
     }
   }, [viewMode]);
 
@@ -158,6 +175,60 @@ export default function AnalyticsDashboardScreen() {
       .then(res => res.json())
       .then(data => { setHourActions(data); setLoadingHourActions(false); })
       .catch(() => setLoadingHourActions(false));
+  };
+
+  // Drill-down by day
+  const handleDayPress = (dayIndex) => {
+    if (viewMode !== 'daily' || !dailyData[dayIndex]) return;
+    
+    const dayData = dailyData[dayIndex];
+    setSelectedPeriod(dayData.period || dayData.date);
+    setPeriodType('day');
+    setShowPeriodModal(true);
+    setLoadingPeriodActions(true);
+    
+    // For daily breakdown, we'll get hourly data for that day
+    const dateId = dayData.date; // Format: "2025-07-14"
+    fetch(`http://localhost:5000/api/analytics/daily-breakdown/${encodeURIComponent(dateId)}${dateQuery()}`)
+      .then(res => res.json())
+      .then(data => { setPeriodActions(data); setLoadingPeriodActions(false); })
+      .catch(() => setLoadingPeriodActions(false));
+  };
+
+  // Drill-down by week
+  const handleWeekPress = (weekIndex) => {
+    if (viewMode !== 'weekly' || !weeklyData[weekIndex]) return;
+    
+    const weekData = weeklyData[weekIndex];
+    setSelectedPeriod(weekData.period || weekData.week);
+    setPeriodType('week');
+    setShowPeriodModal(true);
+    setLoadingPeriodActions(true);
+    
+    // For weekly breakdown, we'll get daily data for that week
+    const weekId = weekData.week; // Format: "2025-W28"
+    fetch(`http://localhost:5000/api/analytics/week-breakdown/${encodeURIComponent(weekId)}${dateQuery()}`)
+      .then(res => res.json())
+      .then(data => { setPeriodActions(data); setLoadingPeriodActions(false); })
+      .catch(() => setLoadingPeriodActions(false));
+  };
+
+  // Drill-down by month
+  const handleMonthPress = (monthIndex) => {
+    if (viewMode !== 'monthly' || !monthlyData[monthIndex]) return;
+    
+    const monthData = monthlyData[monthIndex];
+    setSelectedPeriod(monthData.period || monthData.month);
+    setPeriodType('month');
+    setShowPeriodModal(true);
+    setLoadingPeriodActions(true);
+    
+    // For monthly breakdown, we'll get daily data for that month
+    const monthId = monthData.month; // Format: "2025-07"
+    fetch(`http://localhost:5000/api/analytics/month-breakdown/${encodeURIComponent(monthId)}${dateQuery()}`)
+      .then(res => res.json())
+      .then(data => { setPeriodActions(data); setLoadingPeriodActions(false); })
+      .catch(() => setLoadingPeriodActions(false));
   };
 
   // Chart configs
@@ -534,7 +605,7 @@ export default function AnalyticsDashboardScreen() {
       {/* Usage Trends Chart - Conditional based on view mode */}
       <View style={{ marginHorizontal: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 16, marginTop: 32, paddingBottom: 20 }}>
         <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: theme.text }}>
-          {viewMode === 'daily' ? 'Hourly Usage Trends' :
+          {viewMode === 'daily' ? 'Daily Usage Trends' :
            viewMode === 'weekly' ? 'Weekly Usage Trends' :
            'Monthly Usage Trends'}
         </Text>
@@ -542,31 +613,36 @@ export default function AnalyticsDashboardScreen() {
         {/* Daily (Hourly) View */}
         {viewMode === 'daily' && (
           <>
+            <Text style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 12, textAlign: 'center' }}>
+              Hourly activity trends - Click on any hour bar to see detailed breakdown
+            </Text>
             {loadingHourly ? (
               <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading hourly usage data…</Text>
+            ) : hourlyUsage.length === 0 ? (
+              <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No hourly data available.</Text>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
-                <View style={{ paddingHorizontal: 8 }}>
+                <View style={{ paddingHorizontal: 8, position: 'relative' }}>
                   <BarChart
                     data={hourlyData}
                     width={barWidth * barCount}
                     height={220}
                     fromZero
-                    chartConfig={deviceChartConfig}
+                    chartConfig={deviceChartConfig} // Blue for daily
                     showValuesOnTopOfBars={true}
                     style={{ marginVertical: 8, borderRadius: 16 }}
                     barPercentage={0.7}
                   />
-                  {/* Transparent overlay for making the x-axis numbers clickable */}
+                  {/* Transparent overlay for clickable bars */}
                   <View
                     pointerEvents="box-none"
                     style={{
                       position: 'absolute',
                       left: 8,
-                      top: 196,
+                      top: 8,
                       flexDirection: 'row',
                       width: barWidth * barCount,
-                      height: 24,
+                      height: 180, // Cover the bar area
                     }}
                   >
                     {hourLabels.map((label, i) => (
@@ -574,7 +650,7 @@ export default function AnalyticsDashboardScreen() {
                         key={i}
                         onPress={() => handleHourPress(i)}
                         activeOpacity={0.15}
-                        style={{ width: barWidth, height: 24 }}
+                        style={{ width: barWidth, height: 180 }}
                       />
                     ))}
                   </View>
@@ -587,13 +663,16 @@ export default function AnalyticsDashboardScreen() {
         {/* Weekly View */}
         {viewMode === 'weekly' && (
           <>
+            <Text style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 12, textAlign: 'center' }}>
+              Weekly activity trends - Click on any week bar to see daily breakdown
+            </Text>
             {loadingWeekly ? (
               <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading weekly usage data…</Text>
             ) : weeklyData.length === 0 ? (
               <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No weekly data available.</Text>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
-                <View style={{ paddingHorizontal: 8 }}>
+                <View style={{ paddingHorizontal: 8, position: 'relative' }}>
                   <BarChart
                     data={{
                       labels: weeklyData.map(item => {
@@ -614,6 +693,30 @@ export default function AnalyticsDashboardScreen() {
                     style={{ marginVertical: 8, borderRadius: 16 }}
                     barPercentage={0.7}
                   />
+                  {/* Transparent overlay for clickable bars */}
+                  <View
+                    pointerEvents="box-none"
+                    style={{
+                      position: 'absolute',
+                      left: 8,
+                      top: 8,
+                      flexDirection: 'row',
+                      width: Math.max(screenWidth, weeklyData.length * 80),
+                      height: 180, // Cover the bar area
+                    }}
+                  >
+                    {weeklyData.map((_, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => handleWeekPress(i)}
+                        activeOpacity={0.15}
+                        style={{ 
+                          width: (Math.max(screenWidth, weeklyData.length * 80)) / weeklyData.length, 
+                          height: 180 
+                        }}
+                      />
+                    ))}
+                  </View>
                 </View>
               </ScrollView>
             )}
@@ -623,13 +726,16 @@ export default function AnalyticsDashboardScreen() {
         {/* Monthly View */}
         {viewMode === 'monthly' && (
           <>
+            <Text style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 12, textAlign: 'center' }}>
+              Monthly activity trends - Click on any month bar to see daily breakdown
+            </Text>
             {loadingMonthly ? (
               <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>Loading monthly usage data…</Text>
             ) : monthlyData.length === 0 ? (
               <Text style={{ textAlign: 'center', color: theme.danger, margin: 20 }}>No monthly data available.</Text>
             ) : (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -8 }}>
-                <View style={{ paddingHorizontal: 8 }}>
+                <View style={{ paddingHorizontal: 8, position: 'relative' }}>
                   <BarChart
                     data={{
                       labels: monthlyData.map(item => {
@@ -650,6 +756,30 @@ export default function AnalyticsDashboardScreen() {
                     style={{ marginVertical: 8, borderRadius: 16 }}
                     barPercentage={0.7}
                   />
+                  {/* Transparent overlay for clickable bars */}
+                  <View
+                    pointerEvents="box-none"
+                    style={{
+                      position: 'absolute',
+                      left: 8,
+                      top: 8,
+                      flexDirection: 'row',
+                      width: Math.max(screenWidth, monthlyData.length * 100),
+                      height: 180, // Cover the bar area
+                    }}
+                  >
+                    {monthlyData.map((_, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        onPress={() => handleMonthPress(i)}
+                        activeOpacity={0.15}
+                        style={{ 
+                          width: (Math.max(screenWidth, monthlyData.length * 100)) / monthlyData.length, 
+                          height: 180 
+                        }}
+                      />
+                    ))}
+                  </View>
                 </View>
               </ScrollView>
             )}
@@ -702,6 +832,76 @@ export default function AnalyticsDashboardScreen() {
             )}
             <TouchableOpacity
               onPress={() => setShowHourModal(false)}
+              style={{ alignSelf: 'flex-end', marginTop: 10 }}>
+              <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Period Modal Overlay - For weekly/monthly breakdown */}
+      {showPeriodModal && (viewMode === 'weekly' || viewMode === 'monthly') && (
+        <View style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 999,
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <View style={{
+            backgroundColor: theme.cardBackground,
+            borderRadius: 16,
+            padding: 20,
+            minWidth: 320,
+            maxWidth: '90%',
+            maxHeight: '80%',
+            elevation: 4
+          }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 20, marginBottom: 8, color: theme.text }}>
+              {periodType === 'week' 
+                ? `Daily Breakdown for ${selectedPeriod}` 
+                : `Daily Breakdown for ${selectedPeriod}`}
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 14, marginBottom: 12 }}>
+              {rangeDisplay}
+            </Text>
+            {loadingPeriodActions ? (
+              <Text style={{ color: theme.text }}>Loading breakdown...</Text>
+            ) : periodActions.length === 0 ? (
+              <Text style={{ color: theme.textSecondary }}>No activity recorded for this {periodType}.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 300 }}>
+                {periodActions.map((item, i) => (
+                  <View key={i} style={{ 
+                    marginBottom: 12, 
+                    padding: 12, 
+                    backgroundColor: theme.background, 
+                    borderRadius: 8 
+                  }}>
+                    <Text style={{ fontWeight: 'bold', color: theme.text, marginBottom: 4 }}>
+                      {item.date} - {item.actions} actions
+                    </Text>
+                    {item.topUsers && item.topUsers.length > 0 && (
+                      <View style={{ marginTop: 4 }}>
+                        <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+                          Top users: {item.topUsers.join(', ')}
+                        </Text>
+                      </View>
+                    )}
+                    {item.topDevices && item.topDevices.length > 0 && (
+                      <View style={{ marginTop: 2 }}>
+                        <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+                          Top devices: {item.topDevices.join(', ')}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <TouchableOpacity
+              onPress={() => setShowPeriodModal(false)}
               style={{ alignSelf: 'flex-end', marginTop: 10 }}>
               <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Close</Text>
             </TouchableOpacity>

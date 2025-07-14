@@ -862,3 +862,383 @@ def export_usage_csv_grouped():
     return Response(output.getvalue(),
                     mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment;filename={filename}"})
+
+# Week Breakdown - Get daily breakdown for a specific week
+@analytics_routes.route('/week-breakdown/<week_id>', methods=['GET'])
+def week_breakdown(week_id):
+    """
+    Get daily breakdown for a specific week.
+    week_id format: "2025-W28" (year-week)
+    """
+    try:
+        # Parse week_id like "2025-W28"
+        year_part, week_part = week_id.split('-W')
+        year = int(year_part)
+        week_num = int(week_part)
+        
+        # Calculate start and end dates for the week
+        import calendar
+        irl = timezone('Europe/Dublin')
+        
+        # January 1st of the year
+        jan_1 = datetime(year, 1, 1)
+        
+        # Find the first Monday of the year (start of week 1)
+        days_to_monday = (7 - jan_1.weekday()) % 7
+        if jan_1.weekday() != 0:  # If Jan 1 is not Monday
+            days_to_monday = 7 - jan_1.weekday()
+        
+        first_monday = jan_1 + timedelta(days=days_to_monday)
+        
+        # Calculate start of target week
+        week_start = first_monday + timedelta(weeks=week_num - 1)
+        week_end = week_start + timedelta(days=7)
+        
+        # Convert to UTC
+        start_utc = irl.localize(week_start).astimezone(utc)
+        end_utc = irl.localize(week_end).astimezone(utc)
+        
+        match = {"timestamp": {"$gte": start_utc, "$lt": end_utc}}
+        
+        # Apply filters
+        user = request.args.get('user')
+        if user and user != 'ALL':
+            match["user"] = user
+        match = apply_device_room_filters(match)
+        
+        # Group by day and get summary stats
+        pipeline = [
+            {"$match": match},
+            {
+                "$addFields": {
+                    "date": {
+                        "$dateToString": {
+                            "format": "%Y-%m-%d",
+                            "date": "$timestamp",
+                            "timezone": "Europe/Dublin"
+                        }
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "date": "$date",
+                        "user": "$user",
+                        "device": "$device"
+                    },
+                    "actions": {"$sum": 1}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$_id.date",
+                    "actions": {"$sum": "$actions"},
+                    "users": {"$addToSet": "$_id.user"},
+                    "devices": {"$addToSet": "$_id.device"}
+                }
+            },
+            {"$sort": {"_id": 1}}
+        ]
+        
+        results = list(db.device_logs.aggregate(pipeline))
+        
+        # Build device lookup for friendly names
+        all_devices = list(db.devices_collection.find({}))
+        device_lookup = {}
+        for d in all_devices:
+            device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
+            if "entityId" in d:
+                device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
+        
+        def get_friendly_name(device_id):
+            return device_lookup.get(device_id, device_id)
+        
+        # Format results
+        data = []
+        for r in results:
+            # Get top 3 users and devices for this day
+            top_users = r.get("users", [])[:3]
+            top_devices = [get_friendly_name(d) for d in r.get("devices", [])][:3]
+            
+            data.append({
+                "date": r["_id"],
+                "actions": r["actions"],
+                "topUsers": [u for u in top_users if u],
+                "topDevices": [d for d in top_devices if d]
+            })
+        
+        return jsonify(data)
+        
+    except Exception as e:
+        print(f"[week_breakdown] Error: {e}")
+        return jsonify([])
+
+# Month Breakdown - Get daily breakdown for a specific month
+@analytics_routes.route('/month-breakdown/<month_id>', methods=['GET'])
+def month_breakdown(month_id):
+    """
+    Get daily breakdown for a specific month.
+    month_id format: "2025-07" (year-month)
+    """
+    try:
+        # Parse month_id like "2025-07"
+        year, month = map(int, month_id.split('-'))
+        
+        irl = timezone('Europe/Dublin')
+        
+        # Calculate start and end dates for the month
+        month_start = irl.localize(datetime(year, month, 1))
+        
+        # Calculate last day of month
+        if month == 12:
+            next_month = irl.localize(datetime(year + 1, 1, 1))
+        else:
+            next_month = irl.localize(datetime(year, month + 1, 1))
+        
+        # Convert to UTC
+        start_utc = month_start.astimezone(utc)
+        end_utc = next_month.astimezone(utc)
+        
+        match = {"timestamp": {"$gte": start_utc, "$lt": end_utc}}
+        
+        # Apply filters
+        user = request.args.get('user')
+        if user and user != 'ALL':
+            match["user"] = user
+        match = apply_device_room_filters(match)
+        
+        # Group by day and get summary stats
+        pipeline = [
+            {"$match": match},
+            {
+                "$addFields": {
+                    "date": {
+                        "$dateToString": {
+                            "format": "%Y-%m-%d",
+                            "date": "$timestamp",
+                            "timezone": "Europe/Dublin"
+                        }
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "date": "$date",
+                        "user": "$user",
+                        "device": "$device"
+                    },
+                    "actions": {"$sum": 1}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$_id.date",
+                    "actions": {"$sum": "$actions"},
+                    "users": {"$addToSet": "$_id.user"},
+                    "devices": {"$addToSet": "$_id.device"}
+                }
+            },
+            {"$sort": {"_id": 1}}
+        ]
+        
+        results = list(db.device_logs.aggregate(pipeline))
+        
+        # Build device lookup for friendly names
+        all_devices = list(db.devices_collection.find({}))
+        device_lookup = {}
+        for d in all_devices:
+            device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
+            if "entityId" in d:
+                device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
+        
+        def get_friendly_name(device_id):
+            return device_lookup.get(device_id, device_id)
+        
+        # Format results
+        data = []
+        for r in results:
+            # Get top 3 users and devices for this day
+            top_users = r.get("users", [])[:3]
+            top_devices = [get_friendly_name(d) for d in r.get("devices", [])][:3]
+            
+            data.append({
+                "date": r["_id"],
+                "actions": r["actions"],
+                "topUsers": [u for u in top_users if u],
+                "topDevices": [d for d in top_devices if d]
+            })
+        
+        return jsonify(data)
+        
+    except Exception as e:
+        print(f"[month_breakdown] Error: {e}")
+        return jsonify([])
+
+# Daily Breakdown - Get hourly breakdown for a specific day
+@analytics_routes.route('/daily-breakdown/<date_str>', methods=['GET'])
+def daily_breakdown(date_str):
+    """
+    Get hourly breakdown for a specific day.
+    date_str format: "2025-07-14" (YYYY-MM-DD)
+    """
+    try:
+        irl = timezone('Europe/Dublin')
+        
+        # Parse the date
+        target_date = datetime.strptime(date_str, "%Y-%m-%d")
+        start_local = irl.localize(target_date.replace(hour=0, minute=0, second=0, microsecond=0))
+        end_local = start_local + timedelta(days=1)
+        
+        # Convert to UTC
+        start_utc = start_local.astimezone(utc)
+        end_utc = end_local.astimezone(utc)
+        
+        match = {"timestamp": {"$gte": start_utc, "$lt": end_utc}}
+        
+        # Apply filters
+        user = request.args.get('user')
+        if user and user != 'ALL':
+            match["user"] = user
+        match = apply_device_room_filters(match)
+        
+        # Group by hour and get summary stats
+        pipeline = [
+            {"$match": match},
+            {
+                "$addFields": {
+                    "hour": {"$hour": {"date": "$timestamp", "timezone": "Europe/Dublin"}}
+                }
+            },
+            {
+                "$group": {
+                    "_id": {
+                        "hour": "$hour",
+                        "user": "$user",
+                        "device": "$device"
+                    },
+                    "actions": {"$sum": 1}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$_id.hour",
+                    "actions": {"$sum": "$actions"},
+                    "users": {"$addToSet": "$_id.user"},
+                    "devices": {"$addToSet": "$_id.device"}
+                }
+            },
+            {"$sort": {"_id": 1}}
+        ]
+        
+        results = list(db.device_logs.aggregate(pipeline))
+        
+        # Build device lookup for friendly names
+        all_devices = list(db.devices_collection.find({}))
+        device_lookup = {}
+        for d in all_devices:
+            device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
+            if "entityId" in d:
+                device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
+        
+        def get_friendly_name(device_id):
+            return device_lookup.get(device_id, device_id)
+        
+        # Format results - ensure all 24 hours are represented
+        hour_data = {}
+        for r in results:
+            hour = r["_id"]
+            top_users = r.get("users", [])[:3]
+            top_devices = [get_friendly_name(d) for d in r.get("devices", [])][:3]
+            
+            hour_data[hour] = {
+                "hour": f"{hour:02d}:00",
+                "actions": r["actions"],
+                "topUsers": [u for u in top_users if u],
+                "topDevices": [d for d in top_devices if d]
+            }
+        
+        # Create full 24-hour data array
+        data = []
+        for hour in range(24):
+            if hour in hour_data:
+                data.append(hour_data[hour])
+            else:
+                data.append({
+                    "hour": f"{hour:02d}:00",
+                    "actions": 0,
+                    "topUsers": [],
+                    "topDevices": []
+                })
+        
+        return jsonify(data)
+        
+    except Exception as e:
+        print(f"[daily_breakdown] Error: {e}")
+        return jsonify([])
+
+# Usage Per Day - New endpoint for daily view with daily bars
+@analytics_routes.route('/usage-per-day', methods=['GET'])
+def usage_per_day():
+    """
+    Group usage data by day within the given date range.
+    Returns daily periods with action counts.
+    """
+    start, end = get_date_range()
+    if not start or not end:
+        # Default to last 7 days if no range specified
+        end = datetime.now(utc)
+        start = end - timedelta(days=7)
+    
+    match = {"timestamp": {"$gte": start, "$lt": end}}
+    
+    # Apply user filter
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        match["user"] = user
+    
+    # Apply device/room filters
+    match = apply_device_room_filters(match)
+    
+    pipeline = [
+        {"$match": match},
+        {
+            "$addFields": {
+                "date": {
+                    "$dateToString": {
+                        "format": "%Y-%m-%d",
+                        "date": "$timestamp",
+                        "timezone": "Europe/Dublin"
+                    }
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": "$date",
+                "actions": {"$sum": 1}
+            }
+        },
+        {"$sort": {"_id": 1}}
+    ]
+    
+    results = list(db.device_logs.aggregate(pipeline))
+    
+    # Format the results
+    data = []
+    for r in results:
+        # Convert date to more readable format
+        try:
+            date_obj = datetime.strptime(r["_id"], "%Y-%m-%d")
+            day_label = date_obj.strftime("%m/%d")  # MM/DD format
+        except:
+            day_label = r["_id"]
+        
+        data.append({
+            "period": day_label,
+            "date": r["_id"],
+            "actions": r["actions"]
+        })
+    
+    return jsonify(data)
