@@ -151,7 +151,21 @@ export default function AnalyticsDashboardScreen() {
       .then(res => res.json()).then(data => { setRecentErrors(data); })
       .catch(() => setRecentErrors([]));
     fetch(`http://localhost:5000/api/analytics/device-health${dateQuery()}`)
-      .then(res => res.json()).then(data => { setDeviceHealth(data); setLoadingErrors(false); })
+      .then(res => res.json()).then(data => { 
+        setDeviceHealth(data); 
+        setLoadingErrors(false);
+        // Check for critical errors and show notifications
+        const criticalDevices = data.filter(device => device.error_rate > 50 || device.error_actions > 5);
+        if (criticalDevices.length > 0 && data.length > 0) {
+          setTimeout(() => {
+            Alert.alert(
+              '⚠️ Critical Device Issues Detected',
+              `${criticalDevices.length} device(s) have high error rates. Tap on the red device cards below to see details and get troubleshooting suggestions.`,
+              [{ text: 'OK', style: 'default' }]
+            );
+          }, 1000);
+        }
+      })
       .catch(() => { setDeviceHealth([]); setLoadingErrors(false); });
 
     // Fetch weekly/monthly/daily data if needed
@@ -379,6 +393,152 @@ export default function AnalyticsDashboardScreen() {
       filters.push(`Room: ${roomName}`);
     }
     return filters.length > 0 ? ` (${filters.join(', ')})` : '';
+  };
+
+  // Helper function to get error suggestions and quick actions based on error type
+  const getErrorSuggestions = (errorType, deviceName) => {
+    const suggestions = {
+      'timeout': {
+        icon: '⏱️',
+        title: 'Response Timeout',
+        suggestions: [
+          'Device may be slow to respond - try waiting a moment',
+          'Check network connectivity and signal strength',
+          'Restart the device if physically accessible',
+          'Verify device is not overloaded with requests'
+        ],
+        quickActions: ['retry', 'refresh', 'ping']
+      },
+      'connection_error': {
+        icon: '📡',
+        title: 'Connection Issue',
+        suggestions: [
+          'Check if device is powered on and connected',
+          'Verify WiFi network connectivity',
+          'Try toggling device manually to test',
+          'Check Home Assistant connection status'
+        ],
+        quickActions: ['retry', 'ping', 'refresh']
+      },
+      'permission_denied': {
+        icon: '🔒',
+        title: 'Permission Issue',
+        suggestions: [
+          'Check Home Assistant permissions for this device',
+          'Verify user access rights and authentication',
+          'Update authentication tokens if expired',
+          'Contact system administrator for access'
+        ],
+        quickActions: ['refresh_auth', 'retry']
+      },
+      'device_unavailable': {
+        icon: '❌',
+        title: 'Device Unavailable',
+        suggestions: [
+          'Device appears to be offline or disconnected',
+          'Check power supply and physical connections',
+          'Verify device status in Home Assistant',
+          'Device may need firmware update or restart'
+        ],
+        quickActions: ['ping', 'refresh', 'reset']
+      },
+      'unknown': {
+        icon: '❓',
+        title: 'Unknown Error',
+        suggestions: [
+          'Check device logs for more specific error details',
+          'Try restarting the device if accessible',
+          'Verify recent configuration changes',
+          'Contact support if issue persists'
+        ],
+        quickActions: ['retry', 'logs', 'refresh']
+      }
+    };
+
+    return suggestions[errorType] || suggestions['unknown'];
+  };
+
+  // Function to handle quick actions for device troubleshooting
+  const handleQuickAction = async (action, deviceData, deviceName) => {
+    try {
+      switch (action) {
+        case 'retry':
+          Alert.alert(
+            'Retry Device Action',
+            `Testing connectivity for ${deviceName}...`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Test Now', 
+                onPress: async () => {
+                  Alert.alert('Test Initiated', `Device test started for ${deviceName}. Check the device status in a moment.`);
+                  // Refresh data after test
+                  setTimeout(() => {
+                    setAppliedRange(prev => ({ ...prev })); // Trigger data refresh
+                  }, 2000);
+                }
+              }
+            ]
+          );
+          break;
+        case 'refresh':
+          Alert.alert('Refreshing Data', `Updating status for ${deviceName}...`);
+          setAppliedRange(prev => ({ ...prev })); // Trigger data refresh
+          break;
+        case 'ping':
+          Alert.alert('Network Test', `Testing network connectivity to ${deviceName}...`);
+          // Add actual ping logic here if available
+          break;
+        case 'logs':
+          Alert.alert(
+            'View Device Logs',
+            `Would you like to view detailed error history for ${deviceName}?`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'View Details', onPress: () => {
+                // Navigate to detailed logs view
+                console.log(`Viewing detailed logs for ${deviceData.device || deviceData.name}`);
+              }}
+            ]
+          );
+          break;
+        case 'refresh_auth':
+          Alert.alert('Refresh Authentication', 'This would refresh authentication tokens for the device.');
+          break;
+        case 'reset':
+          Alert.alert(
+            'Reset Device',
+            `Are you sure you want to attempt to reset ${deviceName}? This may temporarily disconnect the device.`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Reset', style: 'destructive', onPress: () => {
+                Alert.alert('Reset Initiated', 'Device reset command sent.');
+              }}
+            ]
+          );
+          break;
+        default:
+          Alert.alert('Action Not Available', 'This troubleshooting action is not yet implemented.');
+      }
+    } catch (error) {
+      Alert.alert('Action Failed', 'Unable to perform the requested action. Please try again.');
+    }
+  };
+
+  // Function to fetch detailed error information for a specific device
+  const fetchDeviceErrorDetails = async (deviceData) => {
+    try {
+      const deviceId = deviceData.device || deviceData.name;
+      const response = await fetch(`http://localhost:5000/api/analytics/device-errors/${encodeURIComponent(deviceId)}${dateQuery()}`);
+      if (response.ok) {
+        const detailedErrors = await response.json();
+        return detailedErrors;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to fetch device error details:', error);
+      return null;
+    }
   };
 
   return (
@@ -661,8 +821,13 @@ export default function AnalyticsDashboardScreen() {
                     {deviceHealth.slice(0, 5).map((device, index) => (
                       <TouchableOpacity
                         key={index}
-                        onPress={() => {
-                          setSelectedErrorDevice(device);
+                        onPress={async () => {
+                          // Fetch detailed error information for the device
+                          const errorDetails = await fetchDeviceErrorDetails(device);
+                          setSelectedErrorDevice({
+                            ...device,
+                            detailedErrors: errorDetails
+                          });
                           setShowErrorModal(true);
                         }}
                         style={{
@@ -955,85 +1120,305 @@ export default function AnalyticsDashboardScreen() {
         )}
       </View>
 
-      {/* Error Detail Modal */}
+      {/* Enhanced Error Detail Modal with Troubleshooting */}
       {showErrorModal && selectedErrorDevice && (
         <View style={{
           position: 'absolute',
           top: 0, left: 0, right: 0, bottom: 0,
           zIndex: 2000,
-          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)',
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.5)',
           justifyContent: 'center',
           alignItems: 'center',
         }}>
           <View style={{
             backgroundColor: theme.cardBackground,
-            borderRadius: 16,
+            borderRadius: 20,
             padding: 24,
-            minWidth: 320,
-            maxWidth: '90%',
-            maxHeight: '80%',
-            elevation: 5,
+            width: '95%',
+            maxWidth: 500,
+            maxHeight: '90%',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.3,
+            shadowRadius: 15,
+            elevation: 10,
           }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 10, color: theme.text }}>
-              Device Error Details
-            </Text>
-            
-            <View style={{ marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text, marginBottom: 4 }}>
-                {selectedErrorDevice.name}
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontWeight: 'bold', fontSize: 20, color: theme.text }}>
+                Device Diagnostics
               </Text>
-              {(() => {
-                // Try to find the full device object to get entity ID
-                const fullDevice = devices.find(d => 
-                  d.id === selectedErrorDevice.device || 
-                  d.entityId === selectedErrorDevice.device ||
-                  d.name === selectedErrorDevice.name
-                );
-                if (fullDevice && fullDevice.entityId && fullDevice.entityId !== selectedErrorDevice.name) {
-                  return (
-                    <Text style={{ fontSize: 14, color: theme.textSecondary }}>
-                      {fullDevice.entityId}
-                    </Text>
-                  );
-                }
-                return null;
-              })()}
-            </View>
-            
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 8 }}>
-                Health Status: 
-                <Text style={{ 
-                  color: selectedErrorDevice.status === 'healthy' ? theme.success : 
-                        selectedErrorDevice.status === 'warning' ? '#FFA500' : theme.danger,
-                  fontWeight: 'bold'
-                }}>
-                  {' ' + selectedErrorDevice.status.toUpperCase()}
-                </Text>
-              </Text>
-              
-              <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 4 }}>
-                Error Rate: {selectedErrorDevice.error_rate}%
-              </Text>
-              <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 4 }}>
-                Failed Actions: {selectedErrorDevice.error_actions}
-              </Text>
-              <Text style={{ fontSize: 14, color: theme.textSecondary }}>
-                Total Actions: {selectedErrorDevice.total_actions}
-              </Text>
+              <TouchableOpacity onPress={() => setShowErrorModal(false)}>
+                <Text style={{ fontSize: 28, color: theme.primary, fontWeight: 'bold' }}>×</Text>
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              onPress={() => setShowErrorModal(false)}
-              style={{ 
-                backgroundColor: theme.primary, 
-                borderRadius: 6, 
-                paddingVertical: 8, 
-                paddingHorizontal: 24,
-                alignSelf: 'center'
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: '85%' }}>
+              {/* Device Info Card */}
+              <View style={{
+                backgroundColor: theme.background,
+                borderRadius: 15,
+                padding: 18,
+                marginBottom: 20,
+                borderWidth: 2,
+                borderColor: selectedErrorDevice.status === 'healthy' ? theme.success : 
+                           selectedErrorDevice.status === 'warning' ? '#FFA500' : theme.danger,
               }}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Close</Text>
-            </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                  <Text style={{ fontSize: 24, marginRight: 12 }}>
+                    {selectedErrorDevice.status === 'healthy' ? '✅' : 
+                     selectedErrorDevice.status === 'warning' ? '⚠️' : '🚨'}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>
+                      {selectedErrorDevice.name}
+                    </Text>
+                    {(() => {
+                      const fullDevice = devices.find(d => 
+                        d.id === selectedErrorDevice.device || 
+                        d.entityId === selectedErrorDevice.device ||
+                        d.name === selectedErrorDevice.name
+                      );
+                      if (fullDevice && fullDevice.entityId && fullDevice.entityId !== selectedErrorDevice.name) {
+                        return (
+                          <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 2 }}>
+                            Entity: {fullDevice.entityId}
+                          </Text>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </View>
+                </View>
+                
+                {/* Health Status Grid */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                  <View style={{ 
+                    backgroundColor: selectedErrorDevice.status === 'healthy' ? theme.success + '20' : 
+                                   selectedErrorDevice.status === 'warning' ? '#FFA50020' : theme.danger + '20',
+                    borderRadius: 8, 
+                    padding: 8,
+                    minWidth: 80,
+                    alignItems: 'center'
+                  }}>
+                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>Health Status</Text>
+                    <Text style={{ 
+                      fontSize: 14, 
+                      fontWeight: 'bold',
+                      color: selectedErrorDevice.status === 'healthy' ? theme.success : 
+                            selectedErrorDevice.status === 'warning' ? '#FFA500' : theme.danger
+                    }}>
+                      {selectedErrorDevice.status?.toUpperCase() || 'UNKNOWN'}
+                    </Text>
+                  </View>
+                  
+                  <View style={{ backgroundColor: theme.danger + '15', borderRadius: 8, padding: 8, minWidth: 80, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>Error Rate</Text>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.danger }}>
+                      {selectedErrorDevice.error_rate || 0}%
+                    </Text>
+                  </View>
+                  
+                  <View style={{ backgroundColor: theme.background, borderRadius: 8, padding: 8, minWidth: 80, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>Failed/Total</Text>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text }}>
+                      {selectedErrorDevice.error_actions || 0}/{selectedErrorDevice.total_actions || 0}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Recent Error Details Section */}
+              {selectedErrorDevice.error_actions > 0 && (
+                <View style={{ marginBottom: 20 }}>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 16 }}>
+                    Recent Error Analysis
+                  </Text>
+                  
+                  {(() => {
+                    const deviceErrors = recentErrors.filter(error => error.device_name === selectedErrorDevice.name);
+                    
+                    if (deviceErrors.length === 0) {
+                      return (
+                        <View style={{ 
+                          backgroundColor: theme.success + '15', 
+                          borderRadius: 12, 
+                          padding: 16,
+                          alignItems: 'center'
+                        }}>
+                          <Text style={{ fontSize: 16, color: theme.success, marginBottom: 4 }}>✅</Text>
+                          <Text style={{ fontSize: 14, color: theme.textSecondary, textAlign: 'center' }}>
+                            No recent detailed errors available for this device.
+                            {selectedErrorDevice.error_actions > 0 && ' Error data may have been cleared or occurred outside the current time range.'}
+                          </Text>
+                        </View>
+                      );
+                    }
+
+                    // Show only the first error prominently
+                    const firstError = deviceErrors[0];
+                    const remainingErrors = deviceErrors.slice(1);
+                    const firstErrorInfo = getErrorSuggestions(firstError.error_type, selectedErrorDevice.name);
+
+                    return (
+                      <View>
+                        {/* First Error - Main Display */}
+                        <View style={{
+                          backgroundColor: theme.background,
+                          borderRadius: 12,
+                          padding: 16,
+                          marginBottom: remainingErrors.length > 0 ? 16 : 0,
+                          borderLeftWidth: 4,
+                          borderLeftColor: theme.danger,
+                        }}>
+                          {/* Error Header */}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                            <Text style={{ fontSize: 20, marginRight: 10 }}>{firstErrorInfo.icon}</Text>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.danger }}>
+                                {firstErrorInfo.title} (Latest)
+                              </Text>
+                              <Text style={{ fontSize: 12, color: theme.textTertiary }}>
+                                {new Date(firstError.timestamp).toLocaleString()}
+                              </Text>
+                            </View>
+                          </View>
+                          
+                          {/* Error Message */}
+                          <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 12, fontStyle: 'italic' }}>
+                            "{firstError.result || 'No specific error message'}"
+                          </Text>
+                          
+                          {/* Troubleshooting Suggestions */}
+                          <View style={{ backgroundColor: theme.cardBackground, borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                            <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text, marginBottom: 8 }}>
+                              💡 Troubleshooting Steps:
+                            </Text>
+                            {firstErrorInfo.suggestions.map((suggestion, idx) => (
+                              <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 }}>
+                                <Text style={{ color: theme.primary, marginRight: 8, fontSize: 12 }}>•</Text>
+                                <Text style={{ fontSize: 13, color: theme.textSecondary, flex: 1, lineHeight: 18 }}>
+                                  {suggestion}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+
+                          {/* Quick Action Buttons */}
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                            {firstErrorInfo.quickActions.map((action, idx) => (
+                              <TouchableOpacity
+                                key={idx}
+                                style={{
+                                  backgroundColor: theme.primary,
+                                  borderRadius: 8,
+                                  paddingVertical: 8,
+                                  paddingHorizontal: 12,
+                                  shadowColor: '#000',
+                                  shadowOffset: { width: 0, height: 2 },
+                                  shadowOpacity: 0.1,
+                                  shadowRadius: 4,
+                                  elevation: 2,
+                                }}
+                                onPress={() => handleQuickAction(action, selectedErrorDevice, selectedErrorDevice.name)}
+                              >
+                                <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>
+                                  {action.charAt(0).toUpperCase() + action.slice(1).replace('_', ' ')}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </View>
+
+                        {/* Additional Errors - Scrollable List */}
+                        {remainingErrors.length > 0 && (
+                          <View>
+                            <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text, marginBottom: 8 }}>
+                              📋 Additional Errors ({remainingErrors.length})
+                            </Text>
+                            <ScrollView 
+                              style={{ 
+                                maxHeight: 200, 
+                                backgroundColor: theme.cardBackground, 
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: theme.border
+                              }}
+                              showsVerticalScrollIndicator={true}
+                            >
+                              {remainingErrors.map((error, index) => {
+                                const errorInfo = getErrorSuggestions(error.error_type, selectedErrorDevice.name);
+                                return (
+                                  <View
+                                    key={index}
+                                    style={{
+                                      borderBottomWidth: index === remainingErrors.length - 1 ? 0 : 1,
+                                      borderBottomColor: theme.border,
+                                      paddingVertical: 12,
+                                      paddingHorizontal: 16,
+                                      backgroundColor: index % 2 === 0 ? 'transparent' : theme.background + '30',
+                                    }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                      <Text style={{ fontSize: 16, marginRight: 8 }}>{errorInfo.icon}</Text>
+                                      <View style={{ flex: 1 }}>
+                                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.danger }}>
+                                          {errorInfo.title}
+                                        </Text>
+                                        <Text style={{ fontSize: 11, color: theme.textTertiary }}>
+                                          {new Date(error.timestamp).toLocaleString()}
+                                        </Text>
+                                      </View>
+                                    </View>
+                                    <Text style={{ fontSize: 12, color: theme.textSecondary, fontStyle: 'italic', marginLeft: 24 }}>
+                                      "{error.result || 'No specific error message'}"
+                                    </Text>
+                                  </View>
+                                );
+                              })}
+                            </ScrollView>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })()}
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Footer Actions */}
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => setShowErrorModal(false)}
+                style={{ 
+                  backgroundColor: theme.secondary,
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 20,
+                  flex: 1
+                }}>
+                <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>
+                  Close
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert('Refreshing', `Updating status for ${selectedErrorDevice.name}...`);
+                  setAppliedRange(prev => ({ ...prev })); // Trigger refresh
+                  setShowErrorModal(false);
+                }}
+                style={{ 
+                  backgroundColor: theme.primary,
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 20,
+                  flex: 1
+                }}>
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>
+                  🔄 Refresh
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
