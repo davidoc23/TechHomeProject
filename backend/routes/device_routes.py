@@ -3,6 +3,7 @@ import requests
 import db
 from flask import Blueprint, jsonify, request
 from bson import ObjectId
+from bson.errors import InvalidId
 from db import devices_collection, rooms_collection
 from dotenv import load_dotenv
 from models.device_log import log_device_action
@@ -180,7 +181,9 @@ def add_device():
             user=user,
             device=data.get('name', 'unknown') if 'data' in locals() else "unknown",
             action="add",
-            result=f"error: {str(e)}"
+            result=f"error: {str(e)}",
+            is_error=True,
+            error_type="device_creation_error"
         )
         # DEBUG - print(f" Error: {str(e)}")
         return jsonify({"error": "Failed to add device"}), 500
@@ -202,7 +205,9 @@ def toggle_device(device_id):
                 user=user,
                 device=device_id,
                 action="toggle",
-                result="error: device not found"
+                result="error: device not found",
+                is_error=True,
+                error_type="device_not_found"
             )
             return jsonify({"error": "Device not found"}), 404
 
@@ -226,7 +231,9 @@ def toggle_device(device_id):
                     user=user,
                     device=entity_id,
                     action="toggle",
-                    result=f"error: Home Assistant error {ha_response.text}"
+                    result=f"error: Home Assistant error {ha_response.text}",
+                    is_error=True,
+                    error_type="home_assistant_error"
                 )
                 return jsonify({"error": f"Home Assistant error: {ha_response.text}"}), ha_response.status_code
 
@@ -486,7 +493,7 @@ def remove_device(device_id):
         return jsonify({"error": str(e)}), 500
     
 # Helper robust logger
-def safe_log_device_action(user, device, action, result):
+def safe_log_device_action(user, device, action, result, is_error=False, error_type=None):
     try:
         user = user or "unknown"
         device = device or "unknown"
@@ -496,7 +503,9 @@ def safe_log_device_action(user, device, action, result):
             user=user,
             device=device,
             action=action,
-            result=result
+            result=result,
+            is_error=is_error,
+            error_type=error_type
         )
     except Exception as e:
         print(f"[Logging Error] {e}")
