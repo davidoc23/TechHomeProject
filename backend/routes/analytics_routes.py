@@ -1242,3 +1242,252 @@ def usage_per_day():
         })
     
     return jsonify(data)
+
+# Errors Per Device
+@analytics_routes.route('/errors-per-device', methods=['GET'])
+def errors_per_device():
+    """Get error count by device with device names"""
+    start, end = get_date_range()
+    match = {"is_error": True}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        match["user"] = user
+    
+    # Apply device/room filters
+    match = apply_device_room_filters(match)
+    
+    pipeline = []
+    if match:
+        pipeline.append({"$match": match})
+    pipeline += [
+        {"$group": {"_id": "$device", "errors": {"$sum": 1}, "error_types": {"$addToSet": "$error_type"}}},
+        {"$sort": {"errors": -1}}
+    ]
+    
+    results = list(db.device_logs.aggregate(pipeline))
+    
+    # Get device names
+    object_ids = []
+    entity_ids = []
+    for r in results:
+        if ObjectId.is_valid(r["_id"]):
+            object_ids.append(ObjectId(r["_id"]))
+        else:
+            entity_ids.append(r["_id"])
+    
+    device_name_map = {}
+    for d in db.devices_collection.find({"_id": {"$in": object_ids}}):
+        device_name_map[str(d["_id"])] = d.get("name", str(d["_id"]))
+    if entity_ids:
+        for d in db.devices_collection.find({"entityId": {"$in": entity_ids}}):
+            device_name_map[d.get("entityId")] = d.get("name", d.get("entityId"))
+    
+    data = []
+    for r in results:
+        name = device_name_map.get(r["_id"], r["_id"])
+        data.append({
+            "device": r["_id"], 
+            "errors": r["errors"], 
+            "name": name,
+            "error_types": [et for et in r["error_types"] if et]  # Filter out None values
+        })
+    
+    return jsonify(data)
+
+# Errors Per User
+@analytics_routes.route('/errors-per-user', methods=['GET'])
+def errors_per_user():
+    """Get error count by user"""
+    start, end = get_date_range()
+    match = {"is_error": True}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        match["user"] = user
+    
+    # Apply device/room filters
+    match = apply_device_room_filters(match)
+    
+    pipeline = []
+    if match:
+        pipeline.append({"$match": match})
+    pipeline += [
+        {"$group": {"_id": "$user", "errors": {"$sum": 1}, "error_types": {"$addToSet": "$error_type"}}},
+        {"$sort": {"errors": -1}}
+    ]
+    
+    results = list(db.device_logs.aggregate(pipeline))
+    data = [{"user": r["_id"], "errors": r["errors"], "error_types": [et for et in r["error_types"] if et]} for r in results]
+    return jsonify(data)
+
+# Error Types Distribution
+@analytics_routes.route('/error-types', methods=['GET'])
+def error_types():
+    """Get distribution of error types"""
+    start, end = get_date_range()
+    match = {"is_error": True, "error_type": {"$exists": True, "$ne": None}}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        match["user"] = user
+    
+    # Apply device/room filters
+    match = apply_device_room_filters(match)
+    
+    pipeline = []
+    if match:
+        pipeline.append({"$match": match})
+    pipeline += [
+        {"$group": {"_id": "$error_type", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}}
+    ]
+    
+    results = list(db.device_logs.aggregate(pipeline))
+    data = [{"error_type": r["_id"], "count": r["count"]} for r in results]
+    return jsonify(data)
+
+# Recent Errors
+@analytics_routes.route('/recent-errors', methods=['GET'])
+def recent_errors():
+    """Get recent error logs with device names"""
+    start, end = get_date_range()
+    q = {"is_error": True}
+    if start and end:
+        q["timestamp"] = {"$gte": start, "$lt": end}
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        q["user"] = user
+    
+    # Apply device/room filters
+    q = apply_device_room_filters(q)
+    
+    logs = list(db.device_logs.find(q).sort("timestamp", -1).limit(10))
+    
+    # Get device names
+    object_ids = set()
+    entity_ids = set()
+    for log in logs:
+        dev = log.get("device")
+        if dev:
+            if ObjectId.is_valid(dev):
+                object_ids.add(ObjectId(dev))
+            else:
+                entity_ids.add(dev)
+    
+    lookup_query = []
+    if object_ids:
+        lookup_query.append({"_id": {"$in": list(object_ids)}})
+    if entity_ids:
+        lookup_query.append({"entityId": {"$in": list(entity_ids)}})
+    
+    if lookup_query:
+        all_devices = db.devices_collection.find({"$or": lookup_query})
+    else:
+        all_devices = []
+    
+    device_lookup = {}
+    for d in all_devices:
+        device_lookup[str(d["_id"])] = d.get("name", str(d["_id"]))
+        if "entityId" in d:
+            device_lookup[d["entityId"]] = d.get("name", d.get("entityId"))
+
+    def get_friendly_name(log):
+        dev_id = log.get("device", "")
+        return device_lookup.get(dev_id, dev_id)
+
+    errors = []
+    for log in logs:
+        errors.append({
+            "user": log.get("user", "unknown"),
+            "action": log.get("action", ""),
+            "device_name": get_friendly_name(log),
+            "device": log.get("device", ""),
+            "result": log.get("result", ""),
+            "error_type": log.get("error_type", "unknown"),
+            "timestamp": log.get("timestamp").isoformat() if log.get("timestamp") else "",
+        })
+    
+    return jsonify(errors)
+
+# Device Health Status
+@analytics_routes.route('/device-health', methods=['GET'])
+def device_health():
+    """Get device health status based on error rates"""
+    start, end = get_date_range()
+    match = {}
+    if start and end:
+        match["timestamp"] = {"$gte": start, "$lt": end}
+    user = request.args.get('user')
+    if user and user != 'ALL':
+        match["user"] = user
+    
+    # Apply device/room filters
+    match = apply_device_room_filters(match)
+    
+    # Get total actions per device
+    total_pipeline = []
+    if match:
+        total_pipeline.append({"$match": match})
+    total_pipeline += [
+        {"$group": {"_id": "$device", "total_actions": {"$sum": 1}}},
+    ]
+    
+    # Get error actions per device
+    error_match = {**match, "is_error": True}
+    error_pipeline = []
+    if error_match:
+        error_pipeline.append({"$match": error_match})
+    error_pipeline += [
+        {"$group": {"_id": "$device", "error_actions": {"$sum": 1}}},
+    ]
+    
+    total_results = list(db.device_logs.aggregate(total_pipeline))
+    error_results = list(db.device_logs.aggregate(error_pipeline))
+    
+    # Create error map
+    error_map = {r["_id"]: r["error_actions"] for r in error_results}
+    
+    # Get device names
+    all_device_ids = [r["_id"] for r in total_results]
+    object_ids = [ObjectId(d) for d in all_device_ids if ObjectId.is_valid(d)]
+    entity_ids = [d for d in all_device_ids if not ObjectId.is_valid(d)]
+    
+    device_name_map = {}
+    for d in db.devices_collection.find({"_id": {"$in": object_ids}}):
+        device_name_map[str(d["_id"])] = d.get("name", str(d["_id"]))
+    if entity_ids:
+        for d in db.devices_collection.find({"entityId": {"$in": entity_ids}}):
+            device_name_map[d.get("entityId")] = d.get("name", d.get("entityId"))
+    
+    health_data = []
+    for r in total_results:
+        device_id = r["_id"]
+        total = r["total_actions"]
+        errors = error_map.get(device_id, 0)
+        error_rate = (errors / total) * 100 if total > 0 else 0
+        
+        # Determine health status
+        if error_rate == 0:
+            status = "healthy"
+        elif error_rate < 5:
+            status = "warning"
+        else:
+            status = "critical"
+        
+        health_data.append({
+            "device": device_id,
+            "name": device_name_map.get(device_id, device_id),
+            "total_actions": total,
+            "error_actions": errors,
+            "error_rate": round(error_rate, 2),
+            "status": status
+        })
+    
+    # Sort by error rate descending
+    health_data.sort(key=lambda x: x["error_rate"], reverse=True)
+    
+    return jsonify(health_data)
