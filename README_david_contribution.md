@@ -4,7 +4,6 @@
 
 This file details my individual contributions to the TechHomeProject Final Year Project, with a focus on backend integration, Raspberry Pi & Home Assistant setup, automated testing, user-based device action logging, analytics endpoints, and the new web analytics dashboard for real-time system monitoring.
 
-
 ## Key Responsibilities & Achievements
 
 - **Set up Raspberry Pi 3 and Home Assistant**
@@ -83,6 +82,41 @@ This file details my individual contributions to the TechHomeProject Final Year 
     - **Chart Consistency:** Fixed data validation and loading states across all view modes for reliable user experience
     - **Filter State Management:** Proper mutual exclusivity logic with auto-reset functionality
     - **Enhanced Error States:** Comprehensive handling of loading, empty, and error states with helpful user guidance
+    
+    **Device Error Tracking & Health Management System (Latest Enhancement):**
+    - **Backend Error Infrastructure:**
+      * Added `is_error` and `error_type` fields to device log model for automatic error detection
+      * Implemented comprehensive error analytics endpoints:
+        - `/api/analytics/errors-per-device` - Device-specific error statistics
+        - `/api/analytics/errors-per-user` - User-specific error patterns  
+        - `/api/analytics/error-types` - Error type distribution analysis
+        - `/api/analytics/recent-errors` - Latest error occurrences
+        - `/api/analytics/device-health` - Overall device health status
+      * Enhanced data processing to return device health metrics with both local and Home Assistant device names
+    
+    - **Frontend Error Tracking Dashboard:**
+      * **Device Health Cards:** Color-coded health status indicators (healthy/warning/critical) with error rates and failure counts
+      * **Recent Errors List:** Scrollable list of latest errors with visual highlighting and indicators in activity feed
+      * **Error Types Distribution:** Visual breakdown of different error categories with occurrence counts
+      * **Activity Feed Integration:** Automatic error highlighting in main activity feed for immediate visibility
+    
+    - **Advanced Error Detail Modal:**
+      * **Comprehensive Device Diagnostics:** Full-featured modal showing device health status, error rates, and detailed error analysis
+      * **Single Error Focus with Scrollable Additional Errors:** Latest error displayed prominently with full troubleshooting details, while additional errors are accessible via scrollable list (max 200px height)
+      * **Intelligent Error Suggestions:** Context-aware troubleshooting steps based on error types:
+        - Timeout errors → Network connectivity suggestions
+        - Connection errors → Power/WiFi verification steps  
+        - Permission errors → Authentication refresh guidance
+        - Device unavailable → Physical connectivity checks
+        - Unknown errors → General troubleshooting fallback
+      * **Quick Action Buttons:** Immediate resolution options including Retry, Refresh, Ping, Reset, View Logs, and Refresh Authentication
+      * **Progressive Disclosure UI:** Most important error information shown first, with additional details accessible through intuitive scrolling
+    
+    - **Error Management Features:**
+      * **Real-time Error Detection:** Automatic categorization of device failures during actions
+      * **User-Friendly Error Resolution:** Actionable troubleshooting steps with one-click quick actions
+      * **Comprehensive Error Audit Trail:** Full history of device errors with timestamps and user attribution
+      * **Device Health Monitoring:** Continuous tracking of device reliability and performance metrics
 
 - **Automated Testing**
   - Authored the entire backend test suite (`tests/`), including:
@@ -103,13 +137,14 @@ This file details my individual contributions to the TechHomeProject Final Year 
 
 ## Key Files
 
-- `backend/app.py`, `routes/device_routes.py` – Main endpoints, device logic, device action logging, JWT checks
-- `backend/routes/analytics_routes.py` – Comprehensive analytics endpoints including user/device stats, activity feeds, multi-view trends (daily/weekly/monthly), drill-down breakdowns, and grouped CSV exports
+- `backend/app.py`, `routes/device_routes.py` – Main endpoints, device logic, device action logging, JWT checks, error logging integration
+- `backend/routes/analytics_routes.py` – Comprehensive analytics endpoints including user/device stats, activity feeds, multi-view trends (daily/weekly/monthly), drill-down breakdowns, grouped CSV exports, and complete error tracking analytics
+- `backend/models/device_log.py` – Enhanced device logging model with error detection fields and automatic error categorization
 - `backend/scheduler.py` – Automation scheduling for Home Assistant devices
 - `backend/tests/` – Complete backend test suite
 - `TechHome/hooks/useHomeAssistantDevices.js` – Home Assistant device logic in React Native
 - `TechHome/screens/DeviceManagementScreen.js` – Device management UI
-- `TechHome/screens/AnalyticsDashboardScreen.js` – New analytics dashboard for web/mobile
+- `TechHome/screens/AnalyticsDashboardScreen.js` – Advanced analytics dashboard with comprehensive error tracking, device health monitoring, and actionable error resolution system
 
 
 ## Device Action Logging & Analytics Example
@@ -144,6 +179,63 @@ This file details my individual contributions to the TechHomeProject Final Year 
   "timestamp": "2025-06-20T22:10:10.333+00:00"
 }
 ```
+
+**Enhanced error tracking log entry:**
+```json
+{
+  "user": "David",
+  "device": "light.living_room_lamp",
+  "device_name": "Living Room Lamp",
+  "action": "toggle",
+  "result": "error: Connection timeout",
+  "is_error": true,
+  "error_type": "timeout",
+  "timestamp": "2025-07-16T14:30:15.123+00:00"
+}
+```
+
+**Device health analytics output:**
+```json
+[
+  {
+    "name": "Living Room Lamp",
+    "status": "warning",
+    "error_rate": 15.2,
+    "error_actions": 8,
+    "total_actions": 52
+  },
+  {
+    "name": "Kitchen Light",
+    "status": "healthy", 
+    "error_rate": 2.1,
+    "error_actions": 1,
+    "total_actions": 48
+  }
+]
+```
+
+## Latest UI/UX and Error Tracking Enhancements
+
+- **UI/UX and Theming Enhancements**
+
+  - Added dark mode support for all charts, modals, and activity feeds.
+
+  - Improved time range display for hourly analytics.
+
+  - Added CSV export and "no logs" modal for better feedback and usability.
+
+- **Error Tracking System Implementation**
+
+  - **Backend Error Detection:** Implemented automatic error categorization during device actions, distinguishing between successful operations and various failure types (timeout, connection, permission, device unavailable).
+
+  - **Frontend Error Visualization:** Created comprehensive error tracking interface with color-coded device health cards, recent errors list, and error type distribution analysis.
+
+  - **Modal Design Challenge:** Successfully implemented single-error focus design with scrollable additional errors, balancing information density with usability. The modal shows the latest error with full troubleshooting details while making additional errors accessible through a clean scrollable interface.
+
+  - **Context-Aware Troubleshooting:** Developed intelligent error suggestion system that provides specific troubleshooting steps based on error type, improving user ability to resolve device issues independently.
+
+  - **Quick Action Integration:** Built actionable error resolution system with one-click buttons for common troubleshooting actions (retry, refresh, ping, reset, view logs, refresh authentication).
+
 ## Key Challenges & Solutions
 
 - **User attribution in logs:**  
