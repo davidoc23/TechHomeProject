@@ -4,6 +4,7 @@
 
 This file details my individual contributions to the TechHomeProject Final Year Project, with a focus on backend integration, Raspberry Pi & Home Assistant setup, automated testing, user-based device action logging, analytics endpoints, and the new web analytics dashboard for real-time system monitoring.
 
+
 ## Key Responsibilities & Achievements
 
 - **Set up Raspberry Pi 3 and Home Assistant**
@@ -178,6 +179,40 @@ This file details my individual contributions to the TechHomeProject Final Year 
   "result": "on",
   "timestamp": "2025-06-20T22:10:10.333+00:00"
 }
+```
+
+**Enhanced error tracking log entry:**
+```json
+{
+  "user": "David",
+  "device": "light.living_room_lamp",
+  "device_name": "Living Room Lamp",
+  "action": "toggle",
+  "result": "error: Connection timeout",
+  "is_error": true,
+  "error_type": "timeout",
+  "timestamp": "2025-07-16T14:30:15.123+00:00"
+}
+```
+
+**Device health analytics output:**
+```json
+[
+  {
+    "name": "Living Room Lamp",
+    "status": "warning",
+    "error_rate": 15.2,
+    "error_actions": 8,
+    "total_actions": 52
+  },
+  {
+    "name": "Kitchen Light",
+    "status": "healthy", 
+    "error_rate": 2.1,
+    "error_actions": 1,
+    "total_actions": 48
+  }
+]
 ```
 
 **Enhanced error tracking log entry:**
