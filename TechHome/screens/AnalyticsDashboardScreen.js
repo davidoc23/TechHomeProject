@@ -73,6 +73,16 @@ export default function AnalyticsDashboardScreen() {
   const [loadingWeekly, setLoadingWeekly] = useState(false);
   const [loadingMonthly, setLoadingMonthly] = useState(false);
 
+  // Error tracking state
+  const [deviceErrors, setDeviceErrors] = useState([]);
+  const [userErrors, setUserErrors] = useState([]);
+  const [errorTypes, setErrorTypes] = useState([]);
+  const [recentErrors, setRecentErrors] = useState([]);
+  const [deviceHealth, setDeviceHealth] = useState([]);
+  const [loadingErrors, setLoadingErrors] = useState(true);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [selectedErrorDevice, setSelectedErrorDevice] = useState(null);
+
   // Helper: build query string for range, user, device, and room
   function dateQuery() {
     let query = '';
@@ -113,7 +123,7 @@ export default function AnalyticsDashboardScreen() {
 
   // Fetch analytics when range or user changes
   useEffect(() => {
-    setLoadingDevices(true); setLoadingUsers(true); setLoadingFeed(true); setLoadingHourly(true);
+    setLoadingDevices(true); setLoadingUsers(true); setLoadingFeed(true); setLoadingHourly(true); setLoadingErrors(true);
     fetch(`http://localhost:5000/api/analytics/usage-per-device${dateQuery()}`)
       .then(res => res.json()).then(data => { setDeviceUsage(data); setLoadingDevices(false); })
       .catch(() => setLoadingDevices(false));
@@ -126,6 +136,23 @@ export default function AnalyticsDashboardScreen() {
     fetch(`http://localhost:5000/api/analytics/usage-per-hour${dateQuery()}`)
       .then(res => res.json()).then(data => { setHourlyUsage(data); setLoadingHourly(false); })
       .catch(() => setLoadingHourly(false));
+
+    // Fetch error data
+    fetch(`http://localhost:5000/api/analytics/errors-per-device${dateQuery()}`)
+      .then(res => res.json()).then(data => { setDeviceErrors(data); })
+      .catch(() => setDeviceErrors([]));
+    fetch(`http://localhost:5000/api/analytics/errors-per-user${dateQuery()}`)
+      .then(res => res.json()).then(data => { setUserErrors(data); })
+      .catch(() => setUserErrors([]));
+    fetch(`http://localhost:5000/api/analytics/error-types${dateQuery()}`)
+      .then(res => res.json()).then(data => { setErrorTypes(data); })
+      .catch(() => setErrorTypes([]));
+    fetch(`http://localhost:5000/api/analytics/recent-errors${dateQuery()}`)
+      .then(res => res.json()).then(data => { setRecentErrors(data); })
+      .catch(() => setRecentErrors([]));
+    fetch(`http://localhost:5000/api/analytics/device-health${dateQuery()}`)
+      .then(res => res.json()).then(data => { setDeviceHealth(data); setLoadingErrors(false); })
+      .catch(() => { setDeviceHealth([]); setLoadingErrors(false); });
 
     // Fetch weekly/monthly/daily data if needed
     if (viewMode === 'daily') {
@@ -543,7 +570,14 @@ export default function AnalyticsDashboardScreen() {
                       {" "}{item.action || 'did something'}{" "}
                       <Text style={{ fontWeight: 'bold', color: theme.text }}>{item.device_name || item.device || 'Unknown Device'}</Text>
                       {" "}
-                      <Text style={{ color: theme.textTertiary }}>{item.result || ''}</Text>
+                      <Text style={{ 
+                        color: item.result && (item.result.includes('error') || item.result.includes('failed')) 
+                          ? theme.danger 
+                          : theme.textTertiary 
+                      }}>
+                        {item.result && (item.result.includes('error') || item.result.includes('failed')) ? '❌ ' : ''}
+                        {item.result || ''}
+                      </Text>
                     </Text>
                     <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>
                       {item.timestamp ? new Date(item.timestamp).toLocaleString() : ''}
@@ -600,6 +634,140 @@ export default function AnalyticsDashboardScreen() {
             />
           )}
         </View>
+      </View>
+
+      {/* Error Tracking & Device Health Section */}
+      <View style={{ marginHorizontal: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 16, marginTop: 32 }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: theme.text }}>
+          Device Health & Error Tracking
+        </Text>
+        
+        {loadingErrors ? (
+          <Text style={{ textAlign: 'center', color: theme.primary, margin: 20 }}>Loading error data…</Text>
+        ) : (
+          <>
+            {/* Device Health Status */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12, color: theme.text }}>
+                Device Health Status
+              </Text>
+              {deviceHealth.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: theme.success, margin: 20 }}>
+                  All devices are healthy! No errors detected.
+                </Text>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: 'row', paddingHorizontal: 4 }}>
+                    {deviceHealth.slice(0, 5).map((device, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => {
+                          setSelectedErrorDevice(device);
+                          setShowErrorModal(true);
+                        }}
+                        style={{
+                          backgroundColor: device.status === 'healthy' ? theme.success : 
+                                         device.status === 'warning' ? '#FFA500' : theme.danger,
+                          borderRadius: 12,
+                          padding: 12,
+                          marginRight: 12,
+                          minWidth: 120,
+                          alignItems: 'center',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 4,
+                          elevation: 3,
+                        }}>
+                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14, textAlign: 'center' }}>
+                          {device.name.length > 12 ? device.name.slice(0, 12) + '…' : device.name}
+                        </Text>
+                        <Text style={{ color: '#fff', fontSize: 12, marginTop: 4 }}>
+                          {device.error_rate}% errors
+                        </Text>
+                        <Text style={{ color: '#fff', fontSize: 10, marginTop: 2 }}>
+                          {device.error_actions}/{device.total_actions} failed
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              )}
+            </View>
+
+            {/* Recent Errors */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12, color: theme.text }}>
+                Recent Errors
+              </Text>
+              {recentErrors.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: theme.success, margin: 20 }}>
+                  No recent errors!
+                </Text>
+              ) : (
+                <View style={{ backgroundColor: theme.background, borderRadius: 8, maxHeight: 200 }}>
+                  <ScrollView>
+                    {recentErrors.slice(0, 3).map((error, i) => (
+                      <View
+                        key={i}
+                        style={{
+                          borderBottomWidth: i === recentErrors.slice(0, 3).length - 1 ? 0 : 1,
+                          borderBottomColor: theme.border,
+                          paddingVertical: 12,
+                          paddingHorizontal: 12,
+                          backgroundColor: theme.danger + '15', // Light red background
+                        }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                          <Text style={{ fontSize: 16, color: theme.danger, marginRight: 8 }}>⚠️</Text>
+                          <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text, flex: 1 }}>
+                            {error.device_name} - {error.action}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 12, color: theme.textSecondary, marginLeft: 24 }}>
+                          {error.user} • {error.error_type || 'Unknown error'}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: theme.textTertiary, marginLeft: 24, marginTop: 2 }}>
+                          {error.timestamp ? new Date(error.timestamp).toLocaleString() : ''}
+                        </Text>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+
+            {/* Error Types Distribution */}
+            {errorTypes.length > 0 && (
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12, color: theme.text }}>
+                  Error Types Distribution
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                  {errorTypes.map((errorType, index) => (
+                    <View
+                      key={index}
+                      style={{
+                        backgroundColor: theme.danger + '20',
+                        borderRadius: 8,
+                        padding: 8,
+                        marginRight: 8,
+                        marginBottom: 8,
+                        borderLeftWidth: 3,
+                        borderLeftColor: theme.danger,
+                      }}>
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.text }}>
+                        {errorType.error_type?.replace(/_/g, ' ').toUpperCase() || 'UNKNOWN'}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: theme.textSecondary }}>
+                        {errorType.count} occurrences
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </>
+        )}
       </View>
 
       {/* Usage Trends Chart - Conditional based on view mode */}
@@ -786,6 +954,89 @@ export default function AnalyticsDashboardScreen() {
           </>
         )}
       </View>
+
+      {/* Error Detail Modal */}
+      {showErrorModal && selectedErrorDevice && (
+        <View style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          zIndex: 2000,
+          backgroundColor: isDarkMode ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <View style={{
+            backgroundColor: theme.cardBackground,
+            borderRadius: 16,
+            padding: 24,
+            minWidth: 320,
+            maxWidth: '90%',
+            maxHeight: '80%',
+            elevation: 5,
+          }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 10, color: theme.text }}>
+              Device Error Details
+            </Text>
+            
+            <View style={{ marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text, marginBottom: 4 }}>
+                {selectedErrorDevice.name}
+              </Text>
+              {(() => {
+                // Try to find the full device object to get entity ID
+                const fullDevice = devices.find(d => 
+                  d.id === selectedErrorDevice.device || 
+                  d.entityId === selectedErrorDevice.device ||
+                  d.name === selectedErrorDevice.name
+                );
+                if (fullDevice && fullDevice.entityId && fullDevice.entityId !== selectedErrorDevice.name) {
+                  return (
+                    <Text style={{ fontSize: 14, color: theme.textSecondary }}>
+                      {fullDevice.entityId}
+                    </Text>
+                  );
+                }
+                return null;
+              })()}
+            </View>
+            
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 8 }}>
+                Health Status: 
+                <Text style={{ 
+                  color: selectedErrorDevice.status === 'healthy' ? theme.success : 
+                        selectedErrorDevice.status === 'warning' ? '#FFA500' : theme.danger,
+                  fontWeight: 'bold'
+                }}>
+                  {' ' + selectedErrorDevice.status.toUpperCase()}
+                </Text>
+              </Text>
+              
+              <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 4 }}>
+                Error Rate: {selectedErrorDevice.error_rate}%
+              </Text>
+              <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 4 }}>
+                Failed Actions: {selectedErrorDevice.error_actions}
+              </Text>
+              <Text style={{ fontSize: 14, color: theme.textSecondary }}>
+                Total Actions: {selectedErrorDevice.total_actions}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setShowErrorModal(false)}
+              style={{ 
+                backgroundColor: theme.primary, 
+                borderRadius: 6, 
+                paddingVertical: 8, 
+                paddingHorizontal: 24,
+                alignSelf: 'center'
+              }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Hour Modal Overlay - Only show in daily mode */}
       {showHourModal && viewMode === 'daily' && (
