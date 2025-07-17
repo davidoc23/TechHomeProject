@@ -1491,3 +1491,110 @@ def device_health():
     health_data.sort(key=lambda x: x["error_rate"], reverse=True)
     
     return jsonify(health_data)
+
+# Group Analysis - New endpoint for analyzing device groups
+@analytics_routes.route('/group-analysis/<group_id>')
+def get_group_analysis(group_id):
+    """
+    Analyze a device group to provide troubleshooting insights.
+    Returns status and error information for all devices in the group.
+    """
+    try:
+        start_utc, end_utc = get_date_range()
+        
+        # Build match query for the time range
+        match_query = {}
+        if start_utc and end_utc:
+            match_query['timestamp'] = {'$gte': start_utc, '$lt': end_utc}
+        
+        # Apply device and room filters if provided
+        apply_device_room_filters(match_query)
+        
+        # For special group IDs like "all_lights", we need to identify the devices
+        if group_id == "all_lights":
+            # Find all light devices
+            devices_cursor = db.devices_collection.find({"type": {"$regex": "light", "$options": "i"}})
+            group_devices = list(devices_cursor)
+        elif group_id == "all_devices":
+            # Find all devices
+            devices_cursor = db.devices_collection.find({})
+            group_devices = list(devices_cursor)
+        else:
+            # Try to find devices that belong to this group/room
+            devices_cursor = db.devices_collection.find({
+                "$or": [
+                    {"room": group_id},
+                    {"group": group_id},
+                    {"_id": group_id} if len(group_id) == 24 else {}
+                ]
+            })
+            group_devices = list(devices_cursor)
+        
+        group_analysis = {
+            "group_id": group_id,
+            "group_name": group_id.replace("_", " ").title(),
+            "devices": [],
+            "summary": {
+                "total_devices": 0,
+                "healthy_devices": 0,
+                "error_devices": 0,
+                "offline_devices": 0
+            }
+        }
+        
+        # Analyze each device in the group
+        for device in group_devices:
+            device_id = str(device.get('_id', ''))
+            device_name = device.get('name', device_id)
+            
+            # Get error count for this device
+            error_match = {**match_query, 'device': device_id, 'success': False}
+            error_count = db.device_actions.count_documents(error_match)
+            
+            # Get total action count
+            total_match = {**match_query, 'device': device_id}
+            total_count = db.device_actions.count_documents(total_match)
+            
+            # Get most recent error
+            recent_error = None
+            if error_count > 0:
+                error_cursor = db.device_actions.find(error_match).sort([('timestamp', -1)]).limit(1)
+                recent_error_doc = list(error_cursor)
+                if recent_error_doc:
+                    recent_error = recent_error_doc[0].get('error_message', 'Unknown error')
+            
+            # Determine device status
+            if total_count == 0:
+                status = "offline"
+                group_analysis["summary"]["offline_devices"] += 1
+            elif error_count == 0:
+                status = "healthy"
+                group_analysis["summary"]["healthy_devices"] += 1
+            elif error_count / total_count > 0.1:  # More than 10% errors
+                status = "critical"
+                group_analysis["summary"]["error_devices"] += 1
+            else:
+                status = "warning"
+                group_analysis["summary"]["error_devices"] += 1
+            
+            group_analysis["devices"].append({
+                "device_id": device_id,
+                "name": device_name,
+                "status": status,
+                "total_actions": total_count,
+                "error_count": error_count,
+                "error_rate": round((error_count / max(total_count, 1)) * 100, 2),
+                "last_error": recent_error,
+                "room": device.get('room', 'Unknown')
+            })
+        
+        group_analysis["summary"]["total_devices"] = len(group_devices)
+        
+        # Sort devices by error rate (highest first)
+        group_analysis["devices"].sort(key=lambda x: x["error_rate"], reverse=True)
+        
+        return jsonify(group_analysis)
+        
+    except Exception as e:
+        print(f"[get_group_analysis] Error: {e}")
+        return jsonify({"error": "Failed to analyze device group", "details": str(e)}), 500
