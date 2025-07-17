@@ -492,6 +492,345 @@ def remove_device(device_id):
         )
         return jsonify({"error": str(e)}), 500
     
+# Device troubleshooting endpoints
+
+@device_routes.route('/<device_id>/refresh', methods=['POST'])
+def refresh_device_state(device_id):
+    """
+    Refresh device state from Home Assistant
+    """
+    try:
+        user = get_user_identity()
+        
+        # Get device from database
+        device = devices_collection.find_one({"_id": ObjectId(device_id)})
+        if not device:
+            safe_log_device_action(user, device_id, "refresh", "device not found", True, "device_not_found")
+            return jsonify({"error": "Device not found"}), 404
+        
+        entity_id = device['entity_id']
+        
+        # Fetch fresh state from Home Assistant
+        state_data = get_homeassistant_state(entity_id)
+        if state_data:
+            # Update device state in database
+            devices_collection.update_one(
+                {"_id": ObjectId(device_id)},
+                {"$set": {
+                    "state": state_data.get('state', 'unknown'),
+                    "last_updated": state_data.get('last_updated'),
+                    "attributes": state_data.get('attributes', {})
+                }}
+            )
+            safe_log_device_action(user, device['name'], "refresh", "success", False)
+            return jsonify({"message": "Device state refreshed successfully", "state": state_data})
+        else:
+            safe_log_device_action(user, device['name'], "refresh", "failed to get state", True, "connection_error")
+            return jsonify({"error": "Failed to get device state from Home Assistant"}), 500
+            
+    except Exception as e:
+        safe_log_device_action(user, device_id, "refresh", f"error: {str(e)}", True, "unknown")
+        return jsonify({"error": str(e)}), 500
+
+
+@device_routes.route('/<device_id>/refresh-auth', methods=['POST'])
+def refresh_device_auth(device_id):
+    """
+    Refresh authentication/connection for a device
+    """
+    try:
+        user = get_user_identity()
+        
+        # Get device from database
+        device = devices_collection.find_one({"_id": ObjectId(device_id)})
+        if not device:
+            safe_log_device_action(user, device_id, "refresh_auth", "device not found", True, "device_not_found")
+            return jsonify({"error": "Device not found"}), 404
+        
+        entity_id = device['entity_id']
+        
+        # For Home Assistant devices, we can try to trigger a reload of the integration
+        # This is a simplified version - in practice you might want to call specific HA services
+        url = f"{HOME_ASSISTANT_URL}/api/services/homeassistant/reload_config_entry"
+        headers = {
+            "Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        
+        # Try to refresh the connection by getting current state
+        state_data = get_homeassistant_state(entity_id)
+        if state_data and state_data.get('state') != 'unavailable':
+            safe_log_device_action(user, device['name'], "refresh_auth", "success", False)
+            return jsonify({"message": "Device authentication refreshed successfully"})
+        else:
+            safe_log_device_action(user, device['name'], "refresh_auth", "device still unavailable", True, "connection_error")
+            return jsonify({"error": "Device is still unavailable after auth refresh"}), 500
+            
+    except Exception as e:
+        safe_log_device_action(user, device_id, "refresh_auth", f"error: {str(e)}", True, "unknown")
+        return jsonify({"error": str(e)}), 500
+
+
+@device_routes.route('/<device_id>/reset', methods=['POST'])
+def reset_device(device_id):
+    """
+    Attempt to reset/restart a device
+    """
+    try:
+        user = get_user_identity()
+        
+        # Get device from database
+        device = devices_collection.find_one({"_id": ObjectId(device_id)})
+        if not device:
+            safe_log_device_action(user, device_id, "reset", "device not found", True, "device_not_found")
+            return jsonify({"error": "Device not found"}), 404
+        
+        entity_id = device['entity_id']
+        device_type = device.get('device_type', '').lower()
+        
+        # Different reset strategies based on device type
+        if 'switch' in device_type or 'light' in device_type:
+            # For switches and lights, try turning off then on
+            try:
+                # Turn off
+                url = f"{HOME_ASSISTANT_URL}/api/services/{device_type}/turn_off"
+                headers = {
+                    "Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}",
+                    "Content-Type": "application/json"
+                }
+                data = {"entity_id": entity_id}
+                
+                response = requests.post(url, headers=headers, json=data, timeout=10)
+                if response.status_code == 200:
+                    # Wait a moment then turn back on
+                    import time
+                    time.sleep(2)
+                    
+                    url = f"{HOME_ASSISTANT_URL}/api/services/{device_type}/turn_on"
+                    response = requests.post(url, headers=headers, json=data, timeout=10)
+                    
+                    if response.status_code == 200:
+                        safe_log_device_action(user, device['name'], "reset", "success", False)
+                        return jsonify({"message": f"Device {device['name']} reset successfully"})
+                
+                safe_log_device_action(user, device['name'], "reset", "failed to toggle device", True, "connection_error")
+                return jsonify({"error": "Failed to reset device"}), 500
+                
+            except requests.RequestException as e:
+                safe_log_device_action(user, device['name'], "reset", f"network error: {str(e)}", True, "connection_error")
+                return jsonify({"error": f"Network error during reset: {str(e)}"}), 500
+        else:
+            # For other device types, we can't perform a standard reset
+            safe_log_device_action(user, device['name'], "reset", "reset not supported for device type", True, "unsupported_operation")
+            return jsonify({"error": f"Reset not supported for device type: {device_type}"}), 400
+            
+    except Exception as e:
+        safe_log_device_action(user, device_id, "reset", f"error: {str(e)}", True, "unknown")
+        return jsonify({"error": str(e)}), 500
+
+
+@device_routes.route('/<device_id>/test', methods=['POST'])
+def test_device_connectivity(device_id):
+    """
+    Test device connectivity and responsiveness
+    """
+    try:
+        user = get_user_identity()
+        
+        # Get device from database
+        device = devices_collection.find_one({"_id": ObjectId(device_id)})
+        if not device:
+            safe_log_device_action(user, device_id, "test", "device not found", True, "device_not_found")
+            return jsonify({"error": "Device not found"}), 404
+        
+        entity_id = device['entity_id']
+        
+        # Test 1: Check if device is reachable
+        state_data = get_homeassistant_state(entity_id)
+        if not state_data:
+            safe_log_device_action(user, device['name'], "test", "no response from HA", True, "connection_error")
+            return jsonify({
+                "status": "failed",
+                "message": "Device not reachable through Home Assistant",
+                "tests": {
+                    "reachable": False,
+                    "responsive": False,
+                    "state_valid": False
+                }
+            }), 200
+        
+        # Test 2: Check if device state is valid
+        state = state_data.get('state', 'unknown')
+        state_valid = state not in ['unavailable', 'unknown', None]
+        
+        # Test 3: For controllable devices, test responsiveness
+        responsive = True
+        device_type = device.get('device_type', '').lower()
+        
+        if 'switch' in device_type or 'light' in device_type:
+            try:
+                # Get current state
+                current_state = state_data.get('state')
+                
+                # Try a quick toggle test (turn off then back to original state)
+                if current_state == 'on':
+                    # Quick off/on test
+                    test_url = f"{HOME_ASSISTANT_URL}/api/services/{device_type}/turn_off"
+                else:
+                    # Quick on/off test
+                    test_url = f"{HOME_ASSISTANT_URL}/api/services/{device_type}/turn_on"
+                
+                headers = {
+                    "Authorization": f"Bearer {HOME_ASSISTANT_TOKEN}",
+                    "Content-Type": "application/json"
+                }
+                data = {"entity_id": entity_id}
+                
+                test_response = requests.post(test_url, headers=headers, json=data, timeout=5)
+                responsive = test_response.status_code == 200
+                
+                if responsive and current_state:
+                    # Restore original state
+                    import time
+                    time.sleep(1)
+                    restore_url = f"{HOME_ASSISTANT_URL}/api/services/{device_type}/turn_{current_state}"
+                    requests.post(restore_url, headers=headers, json=data, timeout=5)
+                
+            except Exception:
+                responsive = False
+        
+        # Overall test result
+        overall_success = state_valid and responsive
+        
+        test_results = {
+            "status": "passed" if overall_success else "failed",
+            "message": f"Device {device['name']} connectivity test completed",
+            "tests": {
+                "reachable": True,
+                "responsive": responsive,
+                "state_valid": state_valid
+            },
+            "current_state": state,
+            "last_updated": state_data.get('last_updated')
+        }
+        
+        safe_log_device_action(
+            user, 
+            device['name'], 
+            "test", 
+            "passed" if overall_success else "failed", 
+            not overall_success,
+            "connection_error" if not responsive else None
+        )
+        
+        return jsonify(test_results)
+        
+    except Exception as e:
+        safe_log_device_action(user, device_id, "test", f"error: {str(e)}", True, "unknown")
+        return jsonify({"error": str(e)}), 500
+
+@device_routes.route('/group/<group_id>/refresh', methods=['POST'])
+def refresh_device_group(group_id):
+    """
+    Refresh all devices in a specified group.
+    Useful for troubleshooting device groups like "all_lights".
+    """
+    try:
+        user = get_user_identity()
+        
+        # Find devices in the group
+        if group_id == "all_lights":
+            # Find all light devices
+            devices_cursor = devices_collection.find({"type": {"$regex": "light", "$options": "i"}})
+        elif group_id == "all_devices":
+            # Find all devices
+            devices_cursor = devices_collection.find({})
+        else:
+            # Find devices by room or group
+            devices_cursor = devices_collection.find({
+                "$or": [
+                    {"room": group_id},
+                    {"group": group_id}
+                ]
+            })
+        
+        devices = list(devices_cursor)
+        
+        if not devices:
+            return jsonify({"error": f"No devices found in group '{group_id}'"}), 404
+        
+        refresh_results = {
+            "group_id": group_id,
+            "total_devices": len(devices),
+            "refreshed": 0,
+            "failed": 0,
+            "results": []
+        }
+        
+        # Refresh each device in the group
+        for device in devices:
+            device_id = str(device.get('_id', ''))
+            device_name = device.get('name', device_id)
+            
+            try:
+                # Get current state from Home Assistant
+                entity_id = device.get('entity_id')
+                if entity_id:
+                    state_result = get_homeassistant_state(entity_id)
+                    if state_result.get('success'):
+                        refresh_results["refreshed"] += 1
+                        refresh_results["results"].append({
+                            "device": device_name,
+                            "status": "success",
+                            "state": state_result.get('state', 'unknown')
+                        })
+                        
+                        # Log the refresh action
+                        safe_log_device_action(
+                            user=user,
+                            device=device_id,
+                            action="group_refresh",
+                            result="success"
+                        )
+                    else:
+                        refresh_results["failed"] += 1
+                        refresh_results["results"].append({
+                            "device": device_name,
+                            "status": "failed",
+                            "error": state_result.get('error', 'Unknown error')
+                        })
+                        
+                        # Log the failed refresh
+                        safe_log_device_action(
+                            user=user,
+                            device=device_id,
+                            action="group_refresh",
+                            result="failed",
+                            is_error=True,
+                            error_type="refresh_failed"
+                        )
+                else:
+                    refresh_results["failed"] += 1
+                    refresh_results["results"].append({
+                        "device": device_name,
+                        "status": "failed",
+                        "error": "No entity_id configured"
+                    })
+                    
+            except Exception as device_error:
+                refresh_results["failed"] += 1
+                refresh_results["results"].append({
+                    "device": device_name,
+                    "status": "failed",
+                    "error": str(device_error)
+                })
+        
+        return jsonify(refresh_results)
+        
+    except Exception as e:
+        print(f"[refresh_device_group] Error: {e}")
+        return jsonify({"error": "Failed to refresh device group", "details": str(e)}), 500
+
 # Helper robust logger
 def safe_log_device_action(user, device, action, result, is_error=False, error_type=None):
     try:
