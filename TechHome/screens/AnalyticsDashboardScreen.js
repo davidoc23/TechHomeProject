@@ -396,10 +396,25 @@ export default function AnalyticsDashboardScreen() {
   };
 
   // Helper function to get error suggestions and quick actions based on error type
-  const getErrorSuggestions = (errorType, deviceName) => {
+  const getErrorSuggestions = (errorType, deviceName, isDeviceGroup = false) => {
+    // Special handling for device groups
+    if (isDeviceGroup) {
+      return {
+        icon: '',
+        title: `${deviceName} Group Diagnostics`,
+        suggestions: [
+          'This represents multiple devices that may have individual issues',
+          'Check individual devices in this group for specific problems',
+          'Verify group-wide settings and automation rules',
+          'Review Home Assistant group configuration'
+        ],
+        quickActions: ['analyze_group', 'refresh_all', 'check_individual']
+      };
+    }
+
     const suggestions = {
       'timeout': {
-        icon: '⏱️',
+        icon: '',
         title: 'Response Timeout',
         suggestions: [
           'Device may be slow to respond - try waiting a moment',
@@ -410,7 +425,7 @@ export default function AnalyticsDashboardScreen() {
         quickActions: ['retry', 'refresh', 'ping']
       },
       'connection_error': {
-        icon: '📡',
+        icon: '',
         title: 'Connection Issue',
         suggestions: [
           'Check if device is powered on and connected',
@@ -421,7 +436,7 @@ export default function AnalyticsDashboardScreen() {
         quickActions: ['retry', 'ping', 'refresh']
       },
       'permission_denied': {
-        icon: '🔒',
+        icon: '',
         title: 'Permission Issue',
         suggestions: [
           'Check Home Assistant permissions for this device',
@@ -432,7 +447,7 @@ export default function AnalyticsDashboardScreen() {
         quickActions: ['refresh_auth', 'retry']
       },
       'device_unavailable': {
-        icon: '❌',
+        icon: '',
         title: 'Device Unavailable',
         suggestions: [
           'Device appears to be offline or disconnected',
@@ -443,7 +458,7 @@ export default function AnalyticsDashboardScreen() {
         quickActions: ['ping', 'refresh', 'reset']
       },
       'unknown': {
-        icon: '❓',
+        icon: '',
         title: 'Unknown Error',
         suggestions: [
           'Check device logs for more specific error details',
@@ -451,77 +466,290 @@ export default function AnalyticsDashboardScreen() {
           'Verify recent configuration changes',
           'Contact support if issue persists'
         ],
-        quickActions: ['retry', 'logs', 'refresh']
+        quickActions: ['retry', 'logs', 'refresh', 'ping']
+      },
+      'network_error': {
+        icon: '',
+        title: 'Network Error',
+        suggestions: [
+          'Check internet connectivity and WiFi signal',
+          'Verify router and network infrastructure',
+          'Test with other devices on the same network',
+          'Restart network equipment if needed'
+        ],
+        quickActions: ['ping', 'retry', 'refresh']
+      },
+      'offline': {
+        icon: '',
+        title: 'Device Offline',
+        suggestions: [
+          'Device appears to be completely offline',
+          'Check power supply and cable connections',
+          'Verify device is responsive to manual controls',
+          'Device may have crashed or frozen'
+        ],
+        quickActions: ['ping', 'refresh', 'reset']
+      },
+      'communication_error': {
+        icon: '',
+        title: 'Communication Error',
+        suggestions: [
+          'Device is not responding to commands properly',
+          'Check protocol compatibility and settings',
+          'Verify device firmware is up to date',
+          'Try re-establishing connection'
+        ],
+        quickActions: ['ping', 'retry', 'refresh', 'reset']
       }
     };
 
-    return suggestions[errorType] || suggestions['unknown'];
+    return suggestions[errorType] || {
+      ...suggestions['unknown'],
+      title: `${errorType?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()) || 'Unknown'} Error`,
+    };
   };
 
   // Function to handle quick actions for device troubleshooting
   const handleQuickAction = async (action, deviceData, deviceName) => {
     try {
+      const deviceId = deviceData.device || deviceData.name || deviceData.id;
+      
+      // Handle special device group actions
+      if (deviceData.isDeviceGroup) {
+        switch (action) {
+          case 'analyze_group':
+            if (window.confirm(`Analyze ${deviceName} group?\n\nThis will check the status of all devices in this group and provide a detailed breakdown.`)) {
+              try {
+                // Fetch individual device statuses for the group
+                const response = await fetch(`http://localhost:5000/api/analytics/group-analysis/${encodeURIComponent(deviceId)}${dateQuery()}`);
+                if (response.ok) {
+                  const groupData = await response.json();
+                  const healthyDevices = groupData.devices?.filter(d => d.status === 'healthy') || [];
+                  const errorDevices = groupData.devices?.filter(d => d.status !== 'healthy') || [];
+                  
+                  let message = `Group Analysis for ${deviceName}:\n\n`;
+                  message += `• Total devices: ${groupData.devices?.length || 0}\n`;
+                  message += `• Healthy devices: ${healthyDevices.length}\n`;
+                  message += `• Devices with issues: ${errorDevices.length}\n\n`;
+                  
+                  if (errorDevices.length > 0) {
+                    message += `Devices with issues:\n`;
+                    errorDevices.slice(0, 5).forEach(device => {
+                      message += `• ${device.name}: ${device.last_error || 'Status issues'}\n`;
+                    });
+                    if (errorDevices.length > 5) {
+                      message += `... and ${errorDevices.length - 5} more\n`;
+                    }
+                  }
+                  
+                  alert(message);
+                } else {
+                  alert(`Unable to analyze ${deviceName} group. The group may not support detailed analysis.`);
+                }
+              } catch (error) {
+                alert(`Error analyzing ${deviceName} group: ${error.message}`);
+              }
+            }
+            break;
+            
+          case 'refresh_all':
+            if (window.confirm(`Refresh all devices in ${deviceName} group?\n\nThis will update the status of all devices in this group.`)) {
+              alert(`Refreshing all devices in ${deviceName}...\n\nThis may take a moment to complete.`);
+              try {
+                await fetch(`http://localhost:5000/api/devices/group/${encodeURIComponent(deviceId)}/refresh`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                
+                // Refresh the analytics data
+                setTimeout(() => {
+                  setAppliedRange(prev => ({ ...prev }));
+                }, 2000);
+                
+                alert(`Group refresh initiated for ${deviceName}. Data will update shortly.`);
+              } catch (error) {
+                alert(`Error refreshing ${deviceName} group: ${error.message}`);
+              }
+            }
+            break;
+            
+          case 'check_individual':
+            alert(`Individual Device Check\n\nTo troubleshoot specific devices in ${deviceName}:\n\n1. Look at the device health status cards above\n2. Click on individual healthy devices (green cards) to see their details\n3. Check the Recent Errors section below for specific device issues\n4. Use device-specific quick actions for targeted troubleshooting`);
+            break;
+            
+          default:
+            alert(`Group action "${action}" is not yet implemented for device groups.`);
+        }
+        return;
+      }
+      
+      // Check if this is a special device identifier that doesn't have API endpoints
+      if (deviceId === 'all_lights' || deviceId === 'all_devices' || !deviceId || deviceId.length < 10) {
+        alert(`Quick actions are not supported for special device groups like "${deviceName}". Please select individual devices for troubleshooting.`);
+        return;
+      }
+      
       switch (action) {
         case 'retry':
-          Alert.alert(
-            'Retry Device Action',
-            `Testing connectivity for ${deviceName}...`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { 
-                text: 'Test Now', 
-                onPress: async () => {
-                  Alert.alert('Test Initiated', `Device test started for ${deviceName}. Check the device status in a moment.`);
-                  // Refresh data after test
-                  setTimeout(() => {
-                    setAppliedRange(prev => ({ ...prev })); // Trigger data refresh
-                  }, 2000);
+          if (window.confirm(`Testing connectivity for ${deviceName}...\n\nClick OK to proceed with the test.`)) {
+            try {
+              // Use the test endpoint for connectivity testing
+              const response = await fetch(`http://localhost:5000/api/devices/${encodeURIComponent(deviceId)}/test`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
                 }
+              });
+              
+              if (response.ok) {
+                const testResult = await response.json();
+                if (testResult.status === 'passed') {
+                  alert(`Device test successful for ${deviceName}.\n\nResults:\n• Reachable: ${testResult.tests.reachable ? 'Yes' : 'No'}\n• Responsive: ${testResult.tests.responsive ? 'Yes' : 'No'}\n• State Valid: ${testResult.tests.state_valid ? 'Yes' : 'No'}\n• Current State: ${testResult.current_state}`);
+                } else {
+                  alert(`Device test completed for ${deviceName}, but some issues detected.\n\nResults:\n• Reachable: ${testResult.tests.reachable ? 'Yes' : 'No'}\n• Responsive: ${testResult.tests.responsive ? 'Yes' : 'No'}\n• State Valid: ${testResult.tests.state_valid ? 'Yes' : 'No'}`);
+                }
+              } else {
+                const errorData = await response.json();
+                alert(`Device test failed for ${deviceName}: ${errorData.error || 'Unknown error'}`);
               }
-            ]
-          );
+            } catch (error) {
+              alert(`Network error testing ${deviceName}: ${error.message}`);
+            }
+            
+            // Refresh data after test
+            setTimeout(() => {
+              setAppliedRange(prev => ({ ...prev })); // Trigger data refresh
+            }, 2000);
+          }
           break;
+          
         case 'refresh':
-          Alert.alert('Refreshing Data', `Updating status for ${deviceName}...`);
+          alert(`Refreshing Data - Updating status for ${deviceName}...`);
+          try {
+            // Refresh device state from Home Assistant
+            await fetch(`http://localhost:5000/api/devices/${encodeURIComponent(deviceId)}/refresh`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+          } catch (error) {
+            console.warn('Failed to refresh device state:', error);
+          }
           setAppliedRange(prev => ({ ...prev })); // Trigger data refresh
           break;
+          
         case 'ping':
-          Alert.alert('Network Test', `Testing network connectivity to ${deviceName}...`);
-          // Add actual ping logic here if available
+          try {
+            alert(`Network Test - Testing network connectivity to ${deviceName}...`);
+            
+            // Simulate a ping test by checking device availability
+            const response = await fetch(`http://localhost:5000/api/devices/${encodeURIComponent(deviceId)}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+            
+            if (response.ok) {
+              const deviceInfo = await response.json();
+              const isOnline = deviceInfo.state !== 'unavailable' && deviceInfo.state !== 'unknown';
+              alert(`${isOnline ? 'SUCCESS' : 'FAILED'} - Ping test complete for ${deviceName}. Device is ${isOnline ? 'online and responding' : 'offline or not responding'}.`);
+            } else {
+              alert(`Ping test failed for ${deviceName}. Device may be offline.`);
+            }
+          } catch (error) {
+            alert(`Network error during ping test for ${deviceName}: ${error.message}`);
+          }
           break;
+          
         case 'logs':
-          Alert.alert(
-            'View Device Logs',
-            `Would you like to view detailed error history for ${deviceName}?`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'View Details', onPress: () => {
-                // Navigate to detailed logs view
-                console.log(`Viewing detailed logs for ${deviceData.device || deviceData.name}`);
-              }}
-            ]
-          );
+          if (window.confirm(`Would you like to view detailed error history for ${deviceName}?`)) {
+            try {
+              // Fetch detailed device logs
+              const response = await fetch(`http://localhost:5000/api/analytics/device-errors/${encodeURIComponent(deviceId)}${dateQuery()}`);
+              if (response.ok) {
+                const logs = await response.json();
+                console.log(`Device logs for ${deviceName}:`, logs);
+                
+                if (logs.length === 0) {
+                  alert(`No error logs found for ${deviceName} in the selected time period.`);
+                } else {
+                  const logSummary = logs.slice(0, 5).map(log => 
+                    `• ${log.error_type || 'Unknown error'} at ${new Date(log.timestamp).toLocaleString()}`
+                  ).join('\n');
+                  alert(`Recent error logs for ${deviceName}:\n\n${logSummary}${logs.length > 5 ? `\n\n... and ${logs.length - 5} more entries` : ''}`);
+                }
+              } else {
+                alert('Failed to fetch device logs. Please try again.');
+              }
+            } catch (error) {
+              alert(` Error fetching logs for ${deviceName}: ${error.message}`);
+            }
+          }
           break;
+          
         case 'refresh_auth':
-          Alert.alert('Refresh Authentication', 'This would refresh authentication tokens for the device.');
+          if (window.confirm(`This will refresh authentication tokens for ${deviceName}. Continue?`)) {
+            try {
+              // Attempt to refresh device authentication/connection
+              const response = await fetch(`http://localhost:5000/api/devices/${encodeURIComponent(deviceId)}/refresh-auth`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+              
+              if (response.ok) {
+                alert(`Authentication refreshed successfully for ${deviceName}.`);
+              } else {
+                alert(`Failed to refresh authentication for ${deviceName}. Manual intervention may be required.`);
+              }
+            } catch (error) {
+              alert(`Error refreshing authentication for ${deviceName}: ${error.message}`);
+            }
+            
+            // Refresh data after auth refresh
+            setTimeout(() => {
+              setAppliedRange(prev => ({ ...prev }));
+            }, 1000);
+          }
           break;
+          
         case 'reset':
-          Alert.alert(
-            'Reset Device',
-            `Are you sure you want to attempt to reset ${deviceName}? This may temporarily disconnect the device.`,
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Reset', style: 'destructive', onPress: () => {
-                Alert.alert('Reset Initiated', 'Device reset command sent.');
-              }}
-            ]
-          );
+          if (window.confirm(`Are you sure you want to attempt to reset ${deviceName}?\n\nThis may temporarily disconnect the device and could affect its current settings.`)) {
+            try {
+              // Attempt to reset/restart the device
+              const response = await fetch(`http://localhost:5000/api/devices/${encodeURIComponent(deviceId)}/reset`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+              
+              if (response.ok) {
+                alert(` Reset command sent to ${deviceName}. The device should restart shortly.`);
+              } else {
+                const errorData = await response.json();
+                alert(`Failed to reset ${deviceName}: ${errorData.error || 'Reset command not supported'}`);
+              }
+            } catch (error) {
+              alert(`Error sending reset command to ${deviceName}: ${error.message}`);
+            }
+            
+            // Refresh data after reset attempt
+            setTimeout(() => {
+              setAppliedRange(prev => ({ ...prev }));
+            }, 3000);
+          }
           break;
+          
         default:
-          Alert.alert('Action Not Available', 'This troubleshooting action is not yet implemented.');
+          alert(`Action Not Available - The "${action}" troubleshooting action is not yet implemented.`);
       }
     } catch (error) {
-      Alert.alert('Action Failed', 'Unable to perform the requested action. Please try again.');
+      console.error('Error in handleQuickAction:', error);
+      alert(`Action Failed - Unable to perform the requested action: ${error.message}`);
     }
   };
 
@@ -822,11 +1050,27 @@ export default function AnalyticsDashboardScreen() {
                       <TouchableOpacity
                         key={index}
                         onPress={async () => {
+                          const deviceId = device.device || device.name;
+                          
+                          // For special device groups, show group diagnostics
+                          if (deviceId === 'all_lights' || deviceId === 'all_devices' || !deviceId || deviceId.length < 10) {
+                            // Still fetch error details to show group-level diagnostics
+                            const errorDetails = await fetchDeviceErrorDetails(device);
+                            setSelectedErrorDevice({
+                              ...device,
+                              detailedErrors: errorDetails,
+                              isDeviceGroup: true // Flag to handle differently in modal
+                            });
+                            setShowErrorModal(true);
+                            return;
+                          }
+                          
                           // Fetch detailed error information for the device
                           const errorDetails = await fetchDeviceErrorDetails(device);
                           setSelectedErrorDevice({
                             ...device,
-                            detailedErrors: errorDetails
+                            detailedErrors: errorDetails,
+                            isDeviceGroup: false
                           });
                           setShowErrorModal(true);
                         }}
@@ -1146,7 +1390,7 @@ export default function AnalyticsDashboardScreen() {
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <Text style={{ fontWeight: 'bold', fontSize: 20, color: theme.text }}>
-                Device Diagnostics
+                {selectedErrorDevice?.isDeviceGroup ? 'Device Group Diagnostics' : 'Device Diagnostics'}
               </Text>
               <TouchableOpacity onPress={() => setShowErrorModal(false)}>
                 <Text style={{ fontSize: 28, color: theme.primary, fontWeight: 'bold' }}>×</Text>
@@ -1173,21 +1417,27 @@ export default function AnalyticsDashboardScreen() {
                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }}>
                       {selectedErrorDevice.name}
                     </Text>
-                    {(() => {
-                      const fullDevice = devices.find(d => 
-                        d.id === selectedErrorDevice.device || 
-                        d.entityId === selectedErrorDevice.device ||
-                        d.name === selectedErrorDevice.name
-                      );
-                      if (fullDevice && fullDevice.entityId && fullDevice.entityId !== selectedErrorDevice.name) {
-                        return (
-                          <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 2 }}>
-                            Entity: {fullDevice.entityId}
-                          </Text>
+                    {selectedErrorDevice.isDeviceGroup ? (
+                      <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 2 }}>
+                        Device Group • Multiple devices managed together
+                      </Text>
+                    ) : (
+                      (() => {
+                        const fullDevice = devices.find(d => 
+                          d.id === selectedErrorDevice.device || 
+                          d.entityId === selectedErrorDevice.device ||
+                          d.name === selectedErrorDevice.name
                         );
-                      }
-                      return null;
-                    })()}
+                        if (fullDevice && fullDevice.entityId && fullDevice.entityId !== selectedErrorDevice.name) {
+                          return (
+                            <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 2 }}>
+                              Entity: {fullDevice.entityId}
+                            </Text>
+                          );
+                        }
+                        return null;
+                      })()
+                    )}
                   </View>
                 </View>
                 
@@ -1258,7 +1508,20 @@ export default function AnalyticsDashboardScreen() {
                     // Show only the first error prominently
                     const firstError = deviceErrors[0];
                     const remainingErrors = deviceErrors.slice(1);
-                    const firstErrorInfo = getErrorSuggestions(firstError.error_type, selectedErrorDevice.name);
+                    const firstErrorInfo = getErrorSuggestions(
+                      firstError.error_type, 
+                      selectedErrorDevice.name,
+                      selectedErrorDevice.isDeviceGroup
+                    );
+                    
+                    // Debug logging for troubleshooting
+                    console.log('Device Diagnostics Debug:', {
+                      deviceName: selectedErrorDevice.name,
+                      deviceId: selectedErrorDevice.device || selectedErrorDevice.name || selectedErrorDevice.id,
+                      errorType: firstError.error_type,
+                      quickActions: firstErrorInfo.quickActions,
+                      hasQuickActions: firstErrorInfo.quickActions && firstErrorInfo.quickActions.length > 0
+                    });
 
                     return (
                       <View>
@@ -1305,28 +1568,39 @@ export default function AnalyticsDashboardScreen() {
                           </View>
 
                           {/* Quick Action Buttons */}
-                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                            {firstErrorInfo.quickActions.map((action, idx) => (
-                              <TouchableOpacity
-                                key={idx}
-                                style={{
-                                  backgroundColor: theme.primary,
-                                  borderRadius: 8,
-                                  paddingVertical: 8,
-                                  paddingHorizontal: 12,
-                                  shadowColor: '#000',
-                                  shadowOffset: { width: 0, height: 2 },
-                                  shadowOpacity: 0.1,
-                                  shadowRadius: 4,
-                                  elevation: 2,
-                                }}
-                                onPress={() => handleQuickAction(action, selectedErrorDevice, selectedErrorDevice.name)}
-                              >
-                                <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>
-                                  {action.charAt(0).toUpperCase() + action.slice(1).replace('_', ' ')}
+                          <View style={{ marginTop: 16 }}>
+                            <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text, marginBottom: 8 }}>
+                              Quick Actions
+                            </Text>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                              {firstErrorInfo.quickActions && firstErrorInfo.quickActions.length > 0 ? (
+                                firstErrorInfo.quickActions.map((action, idx) => (
+                                  <TouchableOpacity
+                                    key={idx}
+                                    style={{
+                                      backgroundColor: theme.primary,
+                                      borderRadius: 8,
+                                      paddingVertical: 8,
+                                      paddingHorizontal: 12,
+                                      shadowColor: '#000',
+                                      shadowOffset: { width: 0, height: 2 },
+                                      shadowOpacity: 0.1,
+                                      shadowRadius: 4,
+                                      elevation: 2,
+                                    }}
+                                    onPress={() => handleQuickAction(action, selectedErrorDevice, selectedErrorDevice.name)}
+                                  >
+                                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold' }}>
+                                      {action.charAt(0).toUpperCase() + action.slice(1).replace('_', ' ')}
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))
+                              ) : (
+                                <Text style={{ fontSize: 12, color: theme.textSecondary, fontStyle: 'italic' }}>
+                                  No automated actions available for this error type
                                 </Text>
-                              </TouchableOpacity>
-                            ))}
+                              )}
+                            </View>
                           </View>
                         </View>
 
@@ -1347,7 +1621,11 @@ export default function AnalyticsDashboardScreen() {
                               showsVerticalScrollIndicator={true}
                             >
                               {remainingErrors.map((error, index) => {
-                                const errorInfo = getErrorSuggestions(error.error_type, selectedErrorDevice.name);
+                                const errorInfo = getErrorSuggestions(
+                                  error.error_type, 
+                                  selectedErrorDevice.name,
+                                  selectedErrorDevice.isDeviceGroup
+                                );
                                 return (
                                   <View
                                     key={index}
@@ -1403,7 +1681,7 @@ export default function AnalyticsDashboardScreen() {
               
               <TouchableOpacity
                 onPress={() => {
-                  Alert.alert('Refreshing', `Updating status for ${selectedErrorDevice.name}...`);
+                  alert(`Refreshing - Updating status for ${selectedErrorDevice.name}...`);
                   setAppliedRange(prev => ({ ...prev })); // Trigger refresh
                   setShowErrorModal(false);
                 }}
