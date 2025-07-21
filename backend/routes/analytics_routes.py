@@ -1598,3 +1598,152 @@ def get_group_analysis(group_id):
     except Exception as e:
         print(f"[get_group_analysis] Error: {e}")
         return jsonify({"error": "Failed to analyze device group", "details": str(e)}), 500
+
+# Active Users with Streaks
+@analytics_routes.route('/active-users-streaks', methods=['GET'])
+def get_active_users_streaks():
+    """
+    Get active users with their usage streaks and activity stats.
+    Returns users with:
+    - Total actions
+    - Days active
+    - Current streak (consecutive days with activity)
+    - Longest streak
+    - Last activity date
+    """
+    try:
+        # Get date range for filtering
+        start_utc, end_utc = get_date_range()
+        
+        # Build base match query
+        match = {}
+        if start_utc and end_utc:
+            match['timestamp'] = {'$gte': start_utc, '$lt': end_utc}
+        
+        # Apply device/room filters if specified
+        apply_device_room_filters(match)
+        
+        # Get all user actions within the date range
+        actions = list(db.device_logs.find(match, {
+            'user': 1, 
+            'timestamp': 1,
+            'device_name': 1,
+            'action': 1
+        }).sort('timestamp', 1))
+        
+        if not actions:
+            return jsonify([])
+        
+        # Group actions by user and calculate daily activity
+        user_activity = defaultdict(lambda: {
+            'total_actions': 0,
+            'active_dates': set(),
+            'last_activity': None,
+            'first_activity': None
+        })
+        
+        for action in actions:
+            user = action.get('user', 'Unknown')
+            timestamp = action.get('timestamp')
+            
+            if timestamp:
+                # Convert to date string for grouping
+                date_str = timestamp.strftime('%Y-%m-%d')
+                user_activity[user]['active_dates'].add(date_str)
+                user_activity[user]['total_actions'] += 1
+                
+                # Track first and last activity
+                if not user_activity[user]['first_activity'] or timestamp < user_activity[user]['first_activity']:
+                    user_activity[user]['first_activity'] = timestamp
+                if not user_activity[user]['last_activity'] or timestamp > user_activity[user]['last_activity']:
+                    user_activity[user]['last_activity'] = timestamp
+        
+        # Calculate streaks for each user
+        result = []
+        for user, data in user_activity.items():
+            active_dates = sorted(list(data['active_dates']))
+            
+            # Calculate current streak and longest streak
+            current_streak = 0
+            longest_streak = 0
+            temp_streak = 1;
+            
+            if active_dates:
+                # Check if user was active today or yesterday for current streak
+                today = datetime.now().strftime('%Y-%m-%d')
+                yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+                
+                # Current streak calculation
+                if today in active_dates:
+                    current_streak = 1
+                    # Count backwards from today
+                    check_date = datetime.now() - timedelta(days=1)
+                    while check_date.strftime('%Y-%m-%d') in active_dates:
+                        current_streak += 1
+                        check_date -= timedelta(days=1)
+                elif yesterday in active_dates:
+                    current_streak = 1
+                    # Count backwards from yesterday
+                    check_date = datetime.now() - timedelta(days=2)
+                    while check_date.strftime('%Y-%m-%d') in active_dates:
+                        current_streak += 1
+                        check_date -= timedelta(days=1)
+                
+                # Longest streak calculation
+                if len(active_dates) == 1:
+                    longest_streak = 1
+                else:
+                    for i in range(1, len(active_dates)):
+                        prev_date = datetime.strptime(active_dates[i-1], '%Y-%m-%d')
+                        curr_date = datetime.strptime(active_dates[i], '%Y-%m-%d')
+                        
+                        # Check if dates are consecutive
+                        if (curr_date - prev_date).days == 1:
+                            temp_streak += 1
+                        else:
+                            longest_streak = max(longest_streak, temp_streak)
+                            temp_streak = 1
+                    
+                    longest_streak = max(longest_streak, temp_streak)
+            
+            # Calculate activity percentage (days active vs total days in range)
+            if start_utc and end_utc:
+                total_days = (end_utc - start_utc).days
+                activity_percentage = (len(active_dates) / total_days * 100) if total_days > 0 else 0
+            else:
+                activity_percentage = 0
+            
+            # Determine user level/badge based on activity
+            badge = "Bronze"
+            if data['total_actions'] >= 100 and longest_streak >= 7:
+                badge = "Platinum"
+            elif data['total_actions'] >= 50 and longest_streak >= 5:
+                badge = "Gold"
+            elif data['total_actions'] >= 20 and longest_streak >= 3:
+                badge = "Silver"
+            
+            result.append({
+                'user': user,
+                'total_actions': data['total_actions'],
+                'days_active': len(active_dates),
+                'current_streak': current_streak,
+                'longest_streak': longest_streak,
+                'activity_percentage': round(activity_percentage, 1),
+                'last_activity': data['last_activity'].isoformat() if data['last_activity'] else None,
+                'first_activity': data['first_activity'].isoformat() if data['first_activity'] else None,
+                'badge': badge,
+                'rank': 0  # Will be set after sorting
+            })
+        
+        # Sort by total actions (primary) and current streak (secondary)
+        result.sort(key=lambda x: (x['total_actions'], x['current_streak']), reverse=True)
+        
+        # Assign ranks
+        for i, user_data in enumerate(result):
+            user_data['rank'] = i + 1
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"[get_active_users_streaks] Error: {e}")
+        return jsonify({"error": "Failed to get active users streaks", "details": str(e)}), 500
