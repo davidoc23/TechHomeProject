@@ -4,7 +4,6 @@
 
 This file details my individual contributions to the TechHomeProject Final Year Project, with a focus on backend integration, Raspberry Pi & Home Assistant setup, automated testing, user-based device action logging, analytics endpoints, and the new web analytics dashboard for real-time system monitoring.
 
-
 ## Key Responsibilities & Achievements
 
 - **Set up Raspberry Pi 3 and Home Assistant**
@@ -84,7 +83,7 @@ This file details my individual contributions to the TechHomeProject Final Year 
     - **Filter State Management:** Proper mutual exclusivity logic with auto-reset functionality
     - **Enhanced Error States:** Comprehensive handling of loading, empty, and error states with helpful user guidance
     
-    **Device Error Tracking & Health Management System (Latest Enhancement):**
+    **Device Error Tracking & Health Management System:**
     - **Backend Error Infrastructure:**
       * Added `is_error` and `error_type` fields to device log model for automatic error detection
       * Implemented comprehensive error analytics endpoints:
@@ -118,6 +117,47 @@ This file details my individual contributions to the TechHomeProject Final Year 
       * **User-Friendly Error Resolution:** Actionable troubleshooting steps with one-click quick actions
       * **Comprehensive Error Audit Trail:** Full history of device errors with timestamps and user attribution
       * **Device Health Monitoring:** Continuous tracking of device reliability and performance metrics
+
+    **Active Users & Usage Streaks System:**
+    - **Backend Streak Analytics:**
+      * Added `/api/analytics/active-users-streaks` endpoint for comprehensive user engagement metrics
+      * Implemented intelligent streak calculation algorithm:
+        - Current streak tracking (consecutive days with activity)
+        - Longest streak calculation across date ranges
+        - Daily activity aggregation with timezone-aware date handling
+        - Activity percentage calculation relative to selected time period
+      * Advanced user ranking system with performance-based badge assignment
+      * Full integration with existing filter system (date range, user, device, room filters)
+    
+    - **Frontend User Engagement Dashboard:**
+      * **Medal Podium Display:** Visual top 3 users with gold/silver/bronze medal representation
+      * **Detailed Activity Table:** Comprehensive scrollable table showing:
+        - User rankings and performance badges (Bronze/Silver/Gold/Platinum)
+        - Total actions count with visual emphasis
+        - Current streak with fire emoji indicator 🔥
+        - Longest streak achievement with calendar emoji 📅
+        - Badge tier visualization with emoji icons
+      * **Activity Summary Cards:** Quick stats overview displaying:
+        - Total active users in period
+        - Users currently maintaining streaks
+        - Longest streak achieved across all users
+        - Total actions aggregate across all users
+    
+    - **Gamification & User Engagement Features:**
+      * **Progressive Badge System:** Four-tier achievement system:
+        - Bronze: Basic activity (default tier)
+        - Silver: 20+ actions + 3+ day streak
+        - Gold: 50+ actions + 5+ day streak  
+        - Platinum: 100+ actions + 7+ day streak
+      * **Streak Intelligence:** Smart current streak detection handles both same-day and previous-day activity
+      * **Real-time Ranking:** Dynamic user rankings based on total actions and current streak performance
+      * **Visual Engagement Elements:** Medal podium, streak fire indicators, and achievement badges
+    
+    - **Technical Implementation:**
+      * **Advanced Date Processing:** Intelligent handling of consecutive day detection across timezone boundaries
+      * **Performance Optimization:** Efficient aggregation pipeline reducing database queries
+      * **Responsive Design:** Adaptive layout supporting both mobile and desktop viewing
+      * **Seamless Integration:** Full compatibility with existing analytics filter and refresh systems
 
 - **Automated Testing**
   - Authored the entire backend test suite (`tests/`), including:
@@ -215,62 +255,35 @@ This file details my individual contributions to the TechHomeProject Final Year 
 ]
 ```
 
-**Enhanced error tracking log entry:**
-```json
-{
-  "user": "David",
-  "device": "light.living_room_lamp",
-  "device_name": "Living Room Lamp",
-  "action": "toggle",
-  "result": "error: Connection timeout",
-  "is_error": true,
-  "error_type": "timeout",
-  "timestamp": "2025-07-16T14:30:15.123+00:00"
-}
-```
-
-**Device health analytics output:**
+**Active users & streaks analytics output:**
 ```json
 [
   {
-    "name": "Living Room Lamp",
-    "status": "warning",
-    "error_rate": 15.2,
-    "error_actions": 8,
-    "total_actions": 52
+    "user": "David",
+    "rank": 1,
+    "total_actions": 156,
+    "days_active": 12,
+    "current_streak": 5,
+    "longest_streak": 8,
+    "activity_percentage": 85.7,
+    "badge": "Platinum",
+    "last_activity": "2025-07-22T14:30:15.123Z",
+    "first_activity": "2025-07-10T09:15:22.456Z"
   },
   {
-    "name": "Kitchen Light",
-    "status": "healthy", 
-    "error_rate": 2.1,
-    "error_actions": 1,
-    "total_actions": 48
+    "user": "mike",
+    "rank": 2,
+    "total_actions": 89,
+    "days_active": 8,
+    "current_streak": 3,
+    "longest_streak": 6,
+    "activity_percentage": 57.1,
+    "badge": "Gold",
+    "last_activity": "2025-07-22T12:45:30.789Z",
+    "first_activity": "2025-07-11T16:20:11.234Z"
   }
 ]
 ```
-
-## Latest UI/UX and Error Tracking Enhancements
-
-- **UI/UX and Theming Enhancements**
-
-  - Added dark mode support for all charts, modals, and activity feeds.
-
-  - Improved time range display for hourly analytics.
-
-  - Added CSV export and "no logs" modal for better feedback and usability.
-
-- **Error Tracking System Implementation**
-
-  - **Backend Error Detection:** Implemented automatic error categorization during device actions, distinguishing between successful operations and various failure types (timeout, connection, permission, device unavailable).
-
-  - **Frontend Error Visualization:** Created comprehensive error tracking interface with color-coded device health cards, recent errors list, and error type distribution analysis.
-
-  - **Modal Design Challenge:** Successfully implemented single-error focus design with scrollable additional errors, balancing information density with usability. The modal shows the latest error with full troubleshooting details while making additional errors accessible through a clean scrollable interface.
-
-  - **Context-Aware Troubleshooting:** Developed intelligent error suggestion system that provides specific troubleshooting steps based on error type, improving user ability to resolve device issues independently.
-
-  - **Quick Action Integration:** Built actionable error resolution system with one-click buttons for common troubleshooting actions (retry, refresh, ping, reset, view logs, refresh authentication).
-
 ## Key Challenges & Solutions
 
 - **User attribution in logs:**  
