@@ -83,6 +83,10 @@ export default function AnalyticsDashboardScreen() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [selectedErrorDevice, setSelectedErrorDevice] = useState(null);
 
+  // Active Users & Streaks state
+  const [activeUsers, setActiveUsers] = useState([]);
+  const [loadingActiveUsers, setLoadingActiveUsers] = useState(true);
+
   // Helper: build query string for range, user, device, and room
   function dateQuery() {
     let query = '';
@@ -123,7 +127,7 @@ export default function AnalyticsDashboardScreen() {
 
   // Fetch analytics when range or user changes
   useEffect(() => {
-    setLoadingDevices(true); setLoadingUsers(true); setLoadingFeed(true); setLoadingHourly(true); setLoadingErrors(true);
+    setLoadingDevices(true); setLoadingUsers(true); setLoadingFeed(true); setLoadingHourly(true); setLoadingErrors(true); setLoadingActiveUsers(true);
     fetch(`http://localhost:5000/api/analytics/usage-per-device${dateQuery()}`)
       .then(res => res.json()).then(data => { setDeviceUsage(data); setLoadingDevices(false); })
       .catch(() => setLoadingDevices(false));
@@ -167,6 +171,14 @@ export default function AnalyticsDashboardScreen() {
         }
       })
       .catch(() => { setDeviceHealth([]); setLoadingErrors(false); });
+
+    // Fetch active users and streaks data
+    fetch(`http://localhost:5000/api/analytics/active-users-streaks${dateQuery()}`)
+      .then(res => res.json()).then(data => { 
+        setActiveUsers(data); 
+        setLoadingActiveUsers(false); 
+      })
+      .catch(() => { setActiveUsers([]); setLoadingActiveUsers(false); });
 
     // Fetch weekly/monthly/daily data if needed
     if (viewMode === 'daily') {
@@ -1022,6 +1034,234 @@ export default function AnalyticsDashboardScreen() {
             />
           )}
         </View>
+      </View>
+
+      {/* Active Users & Usage Streaks Section */}
+      <View style={{ marginHorizontal: 8, backgroundColor: theme.cardBackground, borderRadius: 16, padding: 16, marginTop: 32 }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: theme.text }}>
+          🏆 Active Users & Usage Streaks
+        </Text>
+        
+        {loadingActiveUsers ? (
+          <Text style={{ textAlign: 'center', color: theme.primary, margin: 20 }}>Loading user activity data…</Text>
+        ) : activeUsers.length === 0 ? (
+          <Text style={{ textAlign: 'center', color: theme.textSecondary, margin: 20 }}>
+            No user activity data available for this period.
+          </Text>
+        ) : (
+          <View>
+            {/* Top 3 Users Highlight */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12, color: theme.text }}>
+                🥇 Top Active Users
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                {activeUsers.slice(0, 3).map((user, index) => (
+                  <View
+                    key={index}
+                    style={{
+                      backgroundColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : '#CD7F32',
+                      borderRadius: 12,
+                      padding: 12,
+                      flex: 1,
+                      marginHorizontal: 4,
+                      alignItems: 'center',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 4,
+                      elevation: 3,
+                    }}>
+                    <Text style={{ fontSize: 24, marginBottom: 4 }}>
+                      {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                    </Text>
+                    <Text style={{ 
+                      color: '#000', 
+                      fontWeight: 'bold', 
+                      fontSize: 12, 
+                      textAlign: 'center',
+                      marginBottom: 2
+                    }}>
+                      {user.user.length > 8 ? user.user.slice(0, 8) + '…' : user.user}
+                    </Text>
+                    <Text style={{ color: '#000', fontSize: 10, fontWeight: 'bold' }}>
+                      {user.total_actions} actions
+                    </Text>
+                    <Text style={{ color: '#000', fontSize: 9 }}>
+                      {user.current_streak} day streak
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Detailed User Table */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12, color: theme.text }}>
+                📊 Detailed Activity Breakdown
+              </Text>
+              <ScrollView 
+                style={{ 
+                  maxHeight: 300, 
+                  backgroundColor: theme.background, 
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: theme.border
+                }}
+                showsVerticalScrollIndicator={true}
+              >
+                {activeUsers.map((user, index) => (
+                  <View
+                    key={index}
+                    style={{
+                      borderBottomWidth: index === activeUsers.length - 1 ? 0 : 1,
+                      borderBottomColor: theme.border,
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      backgroundColor: index % 2 === 0 ? theme.cardBackground : theme.background,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                    }}>
+                    
+                    {/* Rank and Badge */}
+                    <View style={{ width: 50, alignItems: 'center' }}>
+                      <Text style={{ 
+                        fontSize: 14, 
+                        fontWeight: 'bold', 
+                        color: theme.text,
+                        marginBottom: 2
+                      }}>
+                        #{user.rank}
+                      </Text>
+                      <Text style={{ fontSize: 10 }}>
+                        {user.badge.split(' ')[0]}
+                      </Text>
+                    </View>
+
+                    {/* User Info */}
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={{ 
+                        fontSize: 16, 
+                        fontWeight: 'bold', 
+                        color: theme.text,
+                        marginBottom: 2
+                      }}>
+                        {user.user}
+                      </Text>
+                      <Text style={{ 
+                        fontSize: 12, 
+                        color: theme.textSecondary 
+                      }}>
+                        {user.badge}
+                      </Text>
+                    </View>
+
+                    {/* Stats */}
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                        <Text style={{ 
+                          fontSize: 12, 
+                          color: theme.textSecondary,
+                          marginRight: 4
+                        }}>
+                          Actions:
+                        </Text>
+                        <Text style={{ 
+                          fontSize: 14, 
+                          fontWeight: 'bold', 
+                          color: theme.primary 
+                        }}>
+                          {user.total_actions}
+                        </Text>
+                      </View>
+                      
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                        <Text style={{ 
+                          fontSize: 12, 
+                          color: theme.textSecondary,
+                          marginRight: 4
+                        }}>
+                          Current:
+                        </Text>
+                        <Text style={{ 
+                          fontSize: 14, 
+                          fontWeight: 'bold', 
+                          color: user.current_streak > 0 ? theme.success : theme.textSecondary 
+                        }}>
+                          {user.current_streak}🔥
+                        </Text>
+                      </View>
+                      
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ 
+                          fontSize: 12, 
+                          color: theme.textSecondary,
+                          marginRight: 4
+                        }}>
+                          Best:
+                        </Text>
+                        <Text style={{ 
+                          fontSize: 14, 
+                          fontWeight: 'bold', 
+                          color: theme.warning 
+                        }}>
+                          {user.longest_streak}📅
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Quick Stats Summary */}
+            <View style={{ 
+              backgroundColor: theme.background, 
+              borderRadius: 12, 
+              padding: 16,
+              borderWidth: 1,
+              borderColor: theme.border
+            }}>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text, marginBottom: 8 }}>
+                📈 Activity Summary
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.primary }}>
+                    {activeUsers.length}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: theme.textSecondary, textAlign: 'center' }}>
+                    Active Users
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.success }}>
+                    {activeUsers.filter(u => u.current_streak > 0).length}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: theme.textSecondary, textAlign: 'center' }}>
+                    On Streak
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.warning }}>
+                    {Math.max(...activeUsers.map(u => u.longest_streak), 0)}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: theme.textSecondary, textAlign: 'center' }}>
+                    Longest Streak
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.secondary }}>
+                    {activeUsers.reduce((sum, u) => sum + u.total_actions, 0)}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: theme.textSecondary, textAlign: 'center' }}>
+                    Total Actions
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Error Tracking & Device Health Section */}
