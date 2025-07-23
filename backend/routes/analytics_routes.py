@@ -1738,9 +1738,17 @@ def get_active_users_streaks():
         # Sort by total actions (primary) and current streak (secondary)
         result.sort(key=lambda x: (x['total_actions'], x['current_streak']), reverse=True)
         
-        # Assign ranks
+        # Assign ranks and update badges based on ranking
         for i, user_data in enumerate(result):
             user_data['rank'] = i + 1
+            
+            # Override badge for top performers (rank-based badges)
+            if i == 0 and len(result) > 0:  # #1 user
+                if user_data['badge'] in ['Bronze', 'Silver']:
+                    user_data['badge'] = 'Gold'  # Ensure #1 is at least Gold
+            elif i == 1 and len(result) > 1:  # #2 user
+                if user_data['badge'] == 'Bronze':
+                    user_data['badge'] = 'Silver'  # Ensure #2 is at least Silver
         
         return jsonify(result)
         

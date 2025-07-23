@@ -1053,7 +1053,7 @@ export default function AnalyticsDashboardScreen() {
             {/* Top 3 Users Highlight */}
             <View style={{ marginBottom: 20 }}>
               <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12, color: theme.text }}>
-                🥇 Top Active Users
+                Top Active Users
               </Text>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 {activeUsers.slice(0, 3).map((user, index) => (
@@ -1073,7 +1073,7 @@ export default function AnalyticsDashboardScreen() {
                       elevation: 3,
                     }}>
                     <Text style={{ fontSize: 24, marginBottom: 4 }}>
-                      {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                      #{index + 1}
                     </Text>
                     <Text style={{ 
                       color: '#000', 
@@ -1089,6 +1089,9 @@ export default function AnalyticsDashboardScreen() {
                     </Text>
                     <Text style={{ color: '#000', fontSize: 9 }}>
                       {user.current_streak} day streak
+                    </Text>
+                    <Text style={{ color: '#000', fontSize: 10, marginTop: 2 }}>
+                      {user.badge}
                     </Text>
                   </View>
                 ))}
@@ -1133,8 +1136,12 @@ export default function AnalyticsDashboardScreen() {
                       }}>
                         #{user.rank}
                       </Text>
-                      <Text style={{ fontSize: 10 }}>
-                        {user.badge.split(' ')[0]}
+                      <Text style={{ 
+                        fontSize: 10, 
+                        color: theme.textSecondary,
+                        textAlign: 'center'
+                      }}>
+                        {user.badge}
                       </Text>
                     </View>
 
@@ -1188,7 +1195,7 @@ export default function AnalyticsDashboardScreen() {
                           fontWeight: 'bold', 
                           color: user.current_streak > 0 ? theme.success : theme.textSecondary 
                         }}>
-                          {user.current_streak}🔥
+                          {user.current_streak} days
                         </Text>
                       </View>
                       
@@ -1205,7 +1212,7 @@ export default function AnalyticsDashboardScreen() {
                           fontWeight: 'bold', 
                           color: theme.warning 
                         }}>
-                          {user.longest_streak}📅
+                          {user.longest_streak} days
                         </Text>
                       </View>
                     </View>
@@ -1251,7 +1258,7 @@ export default function AnalyticsDashboardScreen() {
                   </Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.secondary }}>
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.primary }}>
                     {activeUsers.reduce((sum, u) => sum + u.total_actions, 0)}
                   </Text>
                   <Text style={{ fontSize: 11, color: theme.textSecondary, textAlign: 'center' }}>
@@ -2429,7 +2436,7 @@ export default function AnalyticsDashboardScreen() {
               <TouchableOpacity
                 onPress={() => setShowNoLogsModal(false)}
                 style={{ backgroundColor: theme.primary, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 24 }}>
-                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Close</Text>
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' }}>Close</Text>
               </TouchableOpacity>
             </View>
           </View>
