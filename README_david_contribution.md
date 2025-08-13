@@ -168,6 +168,15 @@ This file details my individual contributions to the TechHomeProject Final Year 
     - Integration flow (`test_integration_flow.py`)
     - Room management (`test_room_routes.py`)
     - ML routes baseline tests (`test_ml_routes.py`)
+    - Analytics comprehensive testing (`test_analytics_routes.py`) - 30 comprehensive test cases covering all analytics functionality including:
+      * Basic analytics endpoints (usage-per-user, usage-per-device, recent-actions)
+      * Multi-view trend analysis (daily/weekly/monthly breakdowns with drill-downs)
+      * Error tracking analytics (errors-per-device, errors-per-user, error-types, device-health)
+      * Active users & streaks system (user engagement metrics with badge system)
+      * CSV export functionality (both basic and grouped exports)
+      * Advanced filtering (date range, user, device, room filters with combinations)
+      * Edge cases and error handling (invalid dates, no data scenarios, large datasets)
+      * Performance testing (100+ log entries) and timezone handling
   - Tests cover core API features, error handling, and edge cases to ensure system robustness.
 
 - **Frontend (React Native) Integration**
@@ -177,12 +186,11 @@ This file details my individual contributions to the TechHomeProject Final Year 
 
 
 ## Key Files
-
+- `backend/tests/` – Complete backend test suite including comprehensive analytics testing.
 - `backend/app.py`, `routes/device_routes.py` – Main endpoints, device logic, device action logging, JWT checks, error logging integration
 - `backend/routes/analytics_routes.py` – Comprehensive analytics endpoints including user/device stats, activity feeds, multi-view trends (daily/weekly/monthly), drill-down breakdowns, grouped CSV exports, and complete error tracking analytics
 - `backend/models/device_log.py` – Enhanced device logging model with error detection fields and automatic error categorization
 - `backend/scheduler.py` – Automation scheduling for Home Assistant devices
-- `backend/tests/` – Complete backend test suite
 - `TechHome/hooks/useHomeAssistantDevices.js` – Home Assistant device logic in React Native
 - `TechHome/screens/DeviceManagementScreen.js` – Device management UI
 - `TechHome/screens/AnalyticsDashboardScreen.js` – Advanced analytics dashboard with comprehensive error tracking, device health monitoring, and actionable error resolution system
@@ -294,6 +302,12 @@ This file details my individual contributions to the TechHomeProject Final Year 
 
 - **Database cleanliness:**  
   Added teardown steps to remove test users, devices, rooms, and logs after each test to prevent polluting the development database.
+
+- **JWT Authentication in Tests:**  
+  Initially device route tests failed with 401 (Unauthorized) errors. Solved by implementing proper `auth_headers` fixtures that register test users and obtain JWT tokens for authenticated API calls.
+
+- **Analytics Test Coverage:**  
+  Created comprehensive test suite for analytics functionality with 30 test cases covering all endpoints, filtering combinations, error scenarios, and edge cases to ensure robust analytics system validation.
 
 - **Deprecation warnings:**  
   Updated datetime code to be timezone-aware to avoid future issues.
